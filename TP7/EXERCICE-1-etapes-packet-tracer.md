@@ -482,7 +482,8 @@ administrer deux machines et réserver deux adresses IP.
 |---|---|---|
 | Les postes n'obtiennent **jamais** d'adresse | `ip helper-address` absent ou mal saisi | `Router0` : *CLI* → `show running-config` → vérifier les deux sous-interfaces, puis `ipconfig /renew` sur le poste |
 | Adresse obtenue, mais **pas de passerelle** | champ *Default Gateway* vide dans le pool | le renseigner (`192.168.10.1` / `192.168.20.1`) et **Save** |
-| `ping` vers l'autre VLAN échoue | sous-interface `down` ou `ip routing` absent | `show ip interface brief` : les deux sous-interfaces doivent être `up/up` ; sinon `no shutdown` + `ip routing` |
+| `ping` vers l'autre VLAN → **`Request timed out`** | le poste cible **n'a pas cette adresse** (pas encore passé en DHCP, ou a reçu une autre IP) | sur le poste cible : *Desktop → IP Configuration* → **DHCP**, puis `ipconfig /all` pour relever son adresse réelle, et pinguer celle-là |
+| `ping` vers l'autre VLAN → **`Destination host unreachable`** | Router0 ne route pas entre ses sous-interfaces (sous-interface `down`, `ip routing` absent) | `show ip interface brief` : les deux sous-interfaces doivent être `up/up` ; sinon `no shutdown` + `ip routing` |
 | `ping 172.16.24.12` échoue | route manquante sur l'un des routeurs | `Router0` : `ip route 172.16.0.0 255.255.0.0 10.6.8.2` ; `Router1` : `ip route 0.0.0.0 0.0.0.0 10.6.8.1` |
 | Le nom ne se résout pas | service DNS **Off**, enregistrement non **sauvegardé**, ou option DNS absente du pool | *Services → DNS* : **On** + `Add` **et** `Save` ; pool DHCP : `DNS Server = 172.16.24.11` |
 | Rien ne se passe / voyants rouges | équipement éteint, câble sur le mauvais port, ou temps non avancé | vérifier l'alimentation (*Physical*), le port (`Fa0/3`, `Fa0/4`, `Fa0/5` sur `Switch1`), puis `Alt + F` |
