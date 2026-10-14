@@ -116,7 +116,7 @@ interface FastEthernet0/0.20
  ip helper-address 172.16.24.12
  exit
 ip routing
-ip route 172.16.24.0 255.255.0.0 10.6.8.2
+ip route 172.16.0.0 255.255.0.0 10.6.8.2
 interface FastEthernet0/1
  description Vers Router1 Gig0/0 (WAN 10.6.8.0/30)
  ip address 10.6.8.1 255.255.255.252
@@ -124,6 +124,11 @@ interface FastEthernet0/1
  end
 show ip interface brief
 ```
+
+> ⚠️ **Piège IOS classique** : `ip route 172.16.24.0 255.255.0.0 …` est refusé —
+> `%Inconsistent address and mask`. Avec un masque `/16`, l'adresse du réseau est
+> **`172.16.0.0`** : l'adresse saisie ne doit pas avoir de bit « hôte » en dehors
+> du masque. La bonne commande est donc `ip route 172.16.0.0 255.255.0.0 10.6.8.2`.
 
 > **Les deux lignes à ne pas oublier** : `ip helper-address 172.16.24.12` sur
 > *chaque* sous-interface (c'est le relais des requêtes DHCP en broadcast vers le
@@ -478,7 +483,7 @@ administrer deux machines et réserver deux adresses IP.
 | Les postes n'obtiennent **jamais** d'adresse | `ip helper-address` absent ou mal saisi | `Router0` : *CLI* → `show running-config` → vérifier les deux sous-interfaces, puis `ipconfig /renew` sur le poste |
 | Adresse obtenue, mais **pas de passerelle** | champ *Default Gateway* vide dans le pool | le renseigner (`192.168.10.1` / `192.168.20.1`) et **Save** |
 | `ping` vers l'autre VLAN échoue | sous-interface `down` ou `ip routing` absent | `show ip interface brief` : les deux sous-interfaces doivent être `up/up` ; sinon `no shutdown` + `ip routing` |
-| `ping 172.16.24.12` échoue | route manquante sur l'un des routeurs | `Router0` : `ip route 172.16.24.0 255.255.0.0 10.6.8.2` ; `Router1` : `ip route 0.0.0.0 0.0.0.0 10.6.8.1` |
+| `ping 172.16.24.12` échoue | route manquante sur l'un des routeurs | `Router0` : `ip route 172.16.0.0 255.255.0.0 10.6.8.2` ; `Router1` : `ip route 0.0.0.0 0.0.0.0 10.6.8.1` |
 | Le nom ne se résout pas | service DNS **Off**, enregistrement non **sauvegardé**, ou option DNS absente du pool | *Services → DNS* : **On** + `Add` **et** `Save` ; pool DHCP : `DNS Server = 172.16.24.11` |
 | Rien ne se passe / voyants rouges | équipement éteint, câble sur le mauvais port, ou temps non avancé | vérifier l'alimentation (*Physical*), le port (`Fa0/3`, `Fa0/4`, `Fa0/5` sur `Switch1`), puis `Alt + F` |
 

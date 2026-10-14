@@ -418,7 +418,7 @@ def shots_packet_tracer():
         "Router(config-subif)#ip helper-address 172.16.24.12",
         "Router(config-subif)#exit",
         "Router(config)#ip routing",
-        "Router(config)#ip route 172.16.24.0 255.255.0.0 10.6.8.2",
+        "Router(config)#ip route 172.16.0.0 255.255.0.0 10.6.8.2",
         "Router(config)#interface FastEthernet0/1",
         "Router(config-if)#ip address 10.6.8.1 255.255.255.252",
         "Router(config-if)#no shutdown",
