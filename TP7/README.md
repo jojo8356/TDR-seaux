@@ -5,8 +5,10 @@ qui les fabrique.
 
 ```
 TP7/
-├── make_screenshots.py   ← génère tout le dossier screenshots/
-└── screenshots/          ← 17 images PNG
+├── TP7.md                              ← le rapport : réponses + captures
+├── EXERCICE-1-etapes-packet-tracer.md  ← mode opératoire clic par clic (exercice 1)
+├── make_screenshots.py                 ← génère tout le dossier screenshots/
+└── screenshots/                        ← 17 images PNG
 ```
 
 ## Comment cloner et lancer

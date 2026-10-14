@@ -18,6 +18,10 @@
 >   le sujet. Rien n'est inventé : tout vient du `.pkt` et de l'énoncé.
 >
 > Pour tout refaire : `python3 TP7/make_screenshots.py` (voir `TP7/README.md`).
+>
+> **Pour les refaire vous-même dans Packet Tracer** (clic par clic, avec la liste
+> des captures à prendre) : voir
+> **[`EXERCICE-1-etapes-packet-tracer.md`](EXERCICE-1-etapes-packet-tracer.md)**.
 
 ```console
 pjl509414@univ:~$ cd ~/TDR-seaux
@@ -51,7 +55,7 @@ VLAN ; il ne reste qu'à adresser et à configurer les services.
 | **VLAN 10** (vert) | `192.168.10.0/24` | passerelle `192.168.10.1` = `Router0` Fa0/0.10 |
 | **VLAN 20** (jaune) | `192.168.20.0/24` | passerelle `192.168.20.1` = `Router0` Fa0/0.20 |
 | **LAN des serveurs** | `172.16.24.0/16` | passerelle `172.16.24.1` = `Router1` Gig0/0 |
-| **Liaison routeurs** | `10.6.8.0/30` | `Router0` Fa0/1 = `10.6.8.1`, `Router1` Gig0/1 = `10.6.8.2` |
+| **Liaison routeurs** | `10.6.8.0/30` | `Router0` Fa0/1 = `10.6.8.1`, `Router1` Gig0/0 = `10.6.8.2` |
 | Serveur DHCP | `172.16.24.12` | *Services → DHCP* |
 | Serveur DNS | `172.16.24.11` | *Services → DNS* |
 | Serveur web 1 | `172.16.24.20` | `www.carrillo.edu` |
@@ -68,7 +72,10 @@ pjl509414@univ:~$ python3 outils/pkt.py devices FichiersPacketTracer/IUT_TP_LAYE
   **VLAN 20**, `Fa0/5` en **trunk** vers `Router0` `Fa0/0` ;
 * `Router0` (1841) : sous-interfaces `Fa0/0.10` et `Fa0/0.20` créées mais **sans
   adresse IP** — c'est la première chose à compléter ;
-* `Switch1`, `Router1`, `Server0` : câblés, non adressés.
+* `Switch1`, `Router1`, `Server0` : câblés, non adressés. Câblage relevé dans le
+  `.pkt` : `Router0` **Fa0/1** vers `Router1` **Gig0/0** (liaison WAN
+  10.6.8.0/30), `Router1` **Gig0/1** vers `Switch1` **Fa0/1** (LAN des serveurs),
+  `Server0` vers `Switch1` **Fa0/2**.
 
 ---
 
@@ -191,10 +198,10 @@ Côté `Router1`, on adresse le LAN des serveurs et on met la route par défaut 
 Router>enable
 Router#configure terminal
 Router(config)#interface GigabitEthernet0/0
-Router(config-if)#ip address 172.16.24.1 255.255.0.0
+Router(config-if)#ip address 10.6.8.2 255.255.255.252   ! vers Router0 Fa0/1
 Router(config-if)#no shutdown
 Router(config-if)#interface GigabitEthernet0/1
-Router(config-if)#ip address 10.6.8.2 255.255.255.252
+Router(config-if)#ip address 172.16.24.1 255.255.0.0    ! LAN des serveurs
 Router(config-if)#no shutdown
 Router(config-if)#exit
 Router(config)#ip route 0.0.0.0 0.0.0.0 10.6.8.1
@@ -254,10 +261,16 @@ VLAN 20 → Router0 → WAN → Router1 → LAN serveurs.
 
 | Serveur | IP | Masque | Passerelle | Rôle |
 |---------|----|--------|-----------|------|
-| `Server0` | `172.16.24.11` | `255.255.0.0` | `172.16.24.1` | **DNS** |
-| `DNS Server` | `172.16.24.11` | `255.255.0.0` | `172.16.24.1` | (si un 2ᵉ serveur est dédié) |
-| `Web Server 1` | `172.16.24.20` | `255.255.0.0` | `172.16.24.1` | `www.carrillo.edu` |
-| `Web Server 2` | `172.16.24.30` | `255.255.0.0` | `172.16.24.1` | `www.international.com` |
+| `Server0` (déjà dans la maquette) | `172.16.24.12` | `255.255.0.0` | `172.16.24.1` | **serveur DHCP** (§1) |
+| `DNS Server` (à ajouter) | `172.16.24.11` | `255.255.0.0` | `172.16.24.1` | **serveur DNS** |
+| `Web Server 1` (à ajouter) | `172.16.24.20` | `255.255.0.0` | `172.16.24.1` | `www.carrillo.edu` |
+| `Web Server 2` (à ajouter) | `172.16.24.30` | `255.255.0.0` | `172.16.24.1` | `www.international.com` |
+
+> La maquette de départ ne contient qu'**un** serveur (`Server0`) : il devient le
+> **serveur DHCP** `172.16.24.12`, et l'on **ajoute trois `Server-PT`** (DNS + les
+> deux serveurs web) sur les ports libres de `Switch1` (`Fa0/3`, `Fa0/4`, `Fa0/5`).
+> Le mode opératoire clic par clic est dans
+> **[`EXERCICE-1-etapes-packet-tracer.md`](EXERCICE-1-etapes-packet-tracer.md)**.
 
 **b) Activer HTTP sur les deux serveurs web** : *Services* → **HTTP** → `On`, puis
 `Edit` la page d'accueil (`index.html`) de chacun pour qu'on les distingue.
