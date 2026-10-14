@@ -128,8 +128,8 @@ def conversations(path: str) -> "collections.OrderedDict":
         p = parse_packet(frame, linktype)
         if not p:
             continue
-        if p["sport"] is None:
-            key = ("%s" % p["src"], 0, "%s" % p["dst"], 0, p["proto"])
+        if p["sport"] is None:      # ICMP et autres protocoles sans ports
+            key = ((p["src"], 0), (p["dst"], 0), p["proto"])
         else:
             key = tuple(sorted([(p["src"], p["sport"]), (p["dst"], p["dport"])])) + (p["proto"],)
         f = flows.setdefault(key, {
@@ -258,6 +258,81 @@ def cmd_text(args) -> int:
     return 0
 
 
+def hexdump(data: bytes, limit: int = 0) -> str:
+    """Rend un bloc d'octets comme `xxd` (16 octets par ligne)."""
+    rows = []
+    view = data[:limit] if limit else data
+    for off in range(0, len(view), 16):
+        chunk = view[off:off + 16]
+        hexa = " ".join("%02x" % b for b in chunk)
+        ascii_ = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
+        rows.append("%04x  %-47s  |%s|" % (off, hexa, ascii_))
+    if limit and len(data) > limit:
+        rows.append("… (%d octets au total)" % len(data))
+    return "\n".join(rows)
+
+
+def match_filter(pkt: dict, expr: str) -> bool:
+    """Filtre minimal façon Wireshark : ip.src/dst/addr == X, tcp/udp.port == N,
+    plus les mots tcp, udp, icmp, reliés par « and » / « && »."""
+    if not expr:
+        return True
+    for part in [p for p in expr.replace("&&", " and ").split(" and ") if p.strip()]:
+        part = part.strip()
+        if part in ("tcp", "udp", "icmp") and protocol_name(pkt["proto"]).lower() == part:
+            continue
+        if "==" not in part:
+            return False
+        field, value = [x.strip() for x in part.split("==", 1)]
+        if field == "ip.src" and pkt["src"] == value:
+            continue
+        if field == "ip.dst" and pkt["dst"] == value:
+            continue
+        if field == "ip.addr" and value in (pkt["src"], pkt["dst"]):
+            continue
+        if field.endswith(".port") and str(pkt["sport"]) == value or \
+           (field.endswith(".port") and str(pkt["dport"]) == value):
+            if field.split(".")[0] in ("tcp", "udp") and \
+               protocol_name(pkt["proto"]).lower() != field.split(".")[0]:
+                return False
+            continue
+        return False
+    return True
+
+
+def cmd_filter(args) -> int:
+    """Liste les paquets qui correspondent à un filtre, à la tcpdump."""
+    linktype, packets = read_pcap(args.fichier)
+    import time as _time
+    shown = total = 0
+    for ts, frame in packets:
+        p = parse_packet(frame, linktype)
+        if not p:
+            continue
+        total += 1
+        if not match_filter(p, args.expression):
+            continue
+        shown += 1
+        if args.head and shown > args.head:
+            continue
+        hhmmss = _time.strftime("%H:%M:%S", _time.localtime(ts))
+        frac = "%06d" % int((ts - int(ts)) * 1e6)
+        if p["sport"] is None:
+            desc = "IP %s > %s: %s" % (p["src"], p["dst"], protocol_name(p["proto"]))
+        elif p["flags"] == "UDP":
+            desc = "IP %s.%s > %s.%s: UDP, length %d" % (
+                p["src"], p["sport"], p["dst"], p["dport"], len(p["payload"]))
+        else:
+            desc = "IP %s.%s > %s.%s: Flags [%s], seq, length %d" % (
+                p["src"], p["sport"], p["dst"], p["dport"], p["flags"], len(p["payload"]))
+        print("%s.%s %s" % (hhmmss, frac, desc))
+    shown_txt = "%d paquet(s) correspondant(s)" % shown
+    if args.head and shown > args.head:
+        shown_txt += ", dont %d affiché(s) (--head %d)" % (args.head, args.head)
+    print("\n%s sur %d paquet(s) analysé(s)" % (shown_txt, total))
+    return 0
+
+
 def cmd_follow(args) -> int:
     flows = conversations(args.fichier)
     target = None
@@ -286,6 +361,9 @@ def cmd_follow(args) -> int:
         body = telnet_strip(blob) if 23 in (a[1], b[1]) else blob
         print("\n### %s -> %s (%d octets de données applicatives) ###"
               % (_endpoint(direction), _endpoint(b if direction == a else a), len(blob)))
+        if args.hex:
+            print(hexdump(body, args.hex))
+            continue
         # latin-1 : chaque octet devient un caractère, sans perte
         text = body.decode("latin-1")
         if not args.raw:
@@ -318,7 +396,15 @@ def main(argv=None) -> int:
     p.add_argument("--client", help="ip:port du client")
     p.add_argument("--server", help="ip:port du serveur")
     p.add_argument("--raw", action="store_true", help="conserver les octets non imprimables")
+    p.add_argument("--hex", type=int, default=0, metavar="OCTETS",
+                   help="affiche le flux en hexadécimal (comme xxd)")
     p.set_defaults(func=cmd_follow)
+
+    p = sub.add_parser("filter", help="liste les paquets correspondant à un filtre (tcpdump)")
+    p.add_argument("fichier")
+    p.add_argument("expression", help="ex. « ip.dst == 138.96.241.88 » ou « tcp.port == 23 »")
+    p.add_argument("--head", type=int, default=0, help="n'afficher que les N premiers paquets")
+    p.set_defaults(func=cmd_filter)
 
     args = parser.parse_args(argv)
     try:

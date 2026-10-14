@@ -187,3 +187,16 @@ chose que pour l'analyse des `.cap`, ou pour piloter Packet Tracer en direct.
 | `twofish.py` | chiffrement Twofish pur Python (module tiers, entête d'origine conservée) |
 | `cap.py` | lecture des `.cap`/`.pcap` : conversations, flux TCP, texte appliqué |
 | `selftest.py` | vérifie tous les outils sur les fichiers du dépôt |
+
+---
+
+## 7. Aller plus loin : le TP7 rédigé
+
+Le dossier [`TP7/`](../TP7/) contient un exemple complet d'utilisation de ces
+outils : `TP7/TP7.md` répond aux questions du TP « Applications » (DHCP, HTTP, DNS,
+Telnet, SSH) avec 17 captures d'écran, dont certaines sont de **vraies sorties** de
+`pkt.py` et `cap.py` exécutées sous `pjl509414@univ:~$`.
+
+```bash
+python3 TP7/make_screenshots.py     # régénère toutes les captures (pip install pillow)
+```
