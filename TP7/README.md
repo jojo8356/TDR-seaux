@@ -5,10 +5,12 @@ qui les fabrique.
 
 ```
 TP7/
-├── TP7.md                              ← le rapport : réponses + captures
+├── TP7.md                              ← le rapport : réponses + captures (ton travail)
 ├── EXERCICE-1-etapes-packet-tracer.md  ← mode opératoire clic par clic (exercice 1)
 ├── make_screenshots.py                 ← génère tout le dossier screenshots/
-└── screenshots/                        ← 17 images PNG
+├── labo/                               ← tes captures Packet Tracer, rangées et nommées
+├── screenshots/                        ← captures d'écran générées (parties II et III)
+└── screenshots-originaux/              ← tes 28 enregistrements d'écran bruts
 ```
 
 ## Comment cloner et lancer

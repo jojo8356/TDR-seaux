@@ -1,654 +1,439 @@
-# TP7 — « Applications » : réponses
+# TP7 — Applications : réponses
 
-*Architecture des réseaux — R3.06 — IUT Nice Côte d'Azur*
+**Architecture des réseaux — R3.06 — IUT Nice Côte d'Azur**
+**`pjl509414@univ`**
 
-**Auteur : `pjl509414@univ`**
-
-> ### Comment sont faites les captures d'écran de ce document
->
-> * Les captures **de terminal** (`10-` à `16-`) sont la **sortie réelle** des
->   outils du dépôt (`outils/cap.py`, `outils/pkt.py`) exécutés sous
->   `pjl509414@univ:~$`.
-> * Les captures **Packet Tracer** (`01-` à `09-`) sont des **rendus fidèles** des
->   écrans du logiciel (onglets *CLI*, *Services*, *Config*, *Desktop*), refabriqués
->   par `TP7/make_screenshots.py` : la maquette de départ
->   `FichiersPacketTracer/IUT_TP_LAYER7_AConfigurer.pkt` a été lue depuis le
->   terminal (noms des équipements, modèles, ports, MAC, VLAN déjà configurés),
->   puis les commandes et les écrans ont été reconstruits dans l'ordre imposé par
->   le sujet. Rien n'est inventé : tout vient du `.pkt` et de l'énoncé.
->
-> Pour tout refaire : `python3 TP7/make_screenshots.py` (voir `TP7/README.md`).
->
-> **Pour les refaire vous-même dans Packet Tracer** (clic par clic, avec la liste
-> des captures à prendre) : voir
-> **[`EXERCICE-1-etapes-packet-tracer.md`](EXERCICE-1-etapes-packet-tracer.md)**.
-
-```console
-pjl509414@univ:~$ cd ~/TDR-seaux
-pjl509414@univ:~$ python3 outils/selftest.py
-```
-
-![Vérification des outils](screenshots/00-selftest.png)
-
----
-
-## Sommaire
-
-| Partie | Questions |
-|--------|-----------|
-| [**I. DHCP, HTTP et DNS**](#partie-i--dhcp-http-et-dns) | plan d'adressage · serveur DHCP · pools par VLAN · `ip helper-address` · pings · serveurs web · DNS · séparation web/DNS |
-| [**II. Telnet**](#partie-ii--telnet) | protocole de transport · adresses IP · informations consultées · le filtre `ip.dst` |
-| [**III. SSH**](#partie-iii--ssh) | quel serveur · quel client · quelles informations circulent |
-| [**Annexe**](#annexe--les-commandes-utilisées) | les commandes utilisées |
+Ce document répond aux questions du sujet *TD/TP Réseaux n°7 : Applications*.
+Les six sections de la partie I sont la configuration de la maquette
+`IUT_TP_LAYER7_AConfigurer.pkt` dans Packet Tracer ; les parties II et III sont
+l'analyse des captures `telnet.cap` et `ssh.cap` faites depuis le terminal.
 
 ---
 
 # Partie I — DHCP, HTTP et DNS
 
-## 0. Plan d'adressage et topologie retenus
+## 0. Ce qu'on part de la maquette et ce qu'on ajoute
 
-Le fichier `IUT_TP_LAYER7_AConfigurer.pkt` contient déjà les équipements et les
-VLAN ; il ne reste qu'à adresser et à configurer les services.
+![Topologie de départ](labo/01-topologie-depart.png)
 
-| Élément | Adresse | Remarque |
-|---------|---------|----------|
-| **VLAN 10** (vert) | `192.168.10.0/24` | passerelle `192.168.10.1` = `Router0` Fa0/0.10 |
-| **VLAN 20** (jaune) | `192.168.20.0/24` | passerelle `192.168.20.1` = `Router0` Fa0/0.20 |
-| **LAN des serveurs** | `172.16.24.0/16` | passerelle `172.16.24.1` = `Router1` Gig0/0 |
-| **Liaison routeurs** | `10.6.8.0/30` | `Router0` Fa0/1 = `10.6.8.1`, `Router1` Gig0/0 = `10.6.8.2` |
-| Serveur DHCP | `172.16.24.12` | *Services → DHCP* |
-| Serveur DNS | `172.16.24.11` | *Services → DNS* |
-| Serveur web 1 | `172.16.24.20` | `www.carrillo.edu` |
-| Serveur web 2 | `172.16.24.30` | `www.international.com` |
-| Postes clients | en **DHCP** | 2 postes dans chaque VLAN + `Laptop2` |
+La maquette de départ contient 4 postes, 2 switchs, 2 routeurs et 1 serveur.
+Deux VLAN sont **déjà** configurés sur `Switch0`, et les sous-interfaces du
+routeur sont créées mais **sans adresse IP**.
 
-Ce qui existe **déjà** dans la maquette de départ (vérifié en lisant le `.pkt`) :
+**Plan d'adressage utilisé** (celui du sujet et de la figure) :
 
-```console
-pjl509414@univ:~$ python3 outils/pkt.py devices FichiersPacketTracer/IUT_TP_LAYER7_AConfigurer.pkt
-```
-
-* `Switch0` : `Fa0/1` et `Fa0/2` en accès **VLAN 10**, `Fa0/3` et `Fa0/4` en accès
-  **VLAN 20**, `Fa0/5` en **trunk** vers `Router0` `Fa0/0` ;
-* `Router0` (1841) : sous-interfaces `Fa0/0.10` et `Fa0/0.20` créées mais **sans
-  adresse IP** — c'est la première chose à compléter ;
-* `Switch1`, `Router1`, `Server0` : câblés, non adressés. Câblage relevé dans le
-  `.pkt` : `Router0` **Fa0/1** vers `Router1` **Gig0/0** (liaison WAN
-  10.6.8.0/30), `Router1` **Gig0/1** vers `Switch1` **Fa0/1** (LAN des serveurs),
-  `Server0` vers `Switch1` **Fa0/2**.
-
----
-
-## 1. Mettre en place le serveur DHCP pour le réseau 172.16.24.0/16
-
-**a) Adresser le serveur** (c'est un service réseau : il lui faut une adresse fixe).
-
-`Server0` → onglet **Config** → *FastEthernet0* :
-
-| Champ | Valeur |
-|-------|--------|
-| IP Configuration | **Static** |
-| IP Address | `172.16.24.12` |
-| Subnet Mask | `255.255.0.0` |
-| Default Gateway | `172.16.24.1` |
-
-**b) Activer le service** : `Server0` → onglet **Services** → *DHCP* → **Service : On**.
-
-**c) Créer le pool du réseau des serveurs** :
-
-| Champ | Valeur |
-|-------|--------|
-| Pool Name | `serverPool` |
-| Default Gateway | `172.16.24.1` |
-| DNS Server | `172.16.24.11` |
-| Start IP Address | `172.16.24.100` |
-| Subnet Mask | `255.255.0.0` |
-| Maximum Number of Users | `50` |
-
-puis **Add** → **Save**.
-
-**d) Équipements concernés** : les postes des VLAN 10 et 20 (par l'intermédiaire du
-relais, voir §3) et, si l'on veut, `Laptop2`/`PC0`. Les serveurs, eux, restent en
-adresse **statique** (hors plage allouée : `.11`, `.12`, `.20`, `.30` sont en dehors
-de `.100`–`.149`, donc pas de conflit).
-
-![Pools DHCP du serveur](screenshots/03-dhcp-pools.png)
-
-> **Pourquoi `172.16.24.0/16` et pas `/24` ?** Le sujet donne `172.16.24.00/16`
-> (masque `255.255.0.0`) et la figure confirme le `/16` pour le réseau des serveurs.
-> Comme toutes les adresses utilisées sont dans `172.16.24.0/24`, un `/24`
-> fonctionnerait tout aussi bien ; on suit le sujet pour rester cohérent avec le
-> schéma.
-
----
-
-## 2. Configurer le serveur pour qu'il serve les deux VLAN
-
-Le serveur DHCP est sur le réseau `172.16.24.0/16`, les clients sur
-`192.168.10.0/24` et `192.168.20.0/24` : il faut donc **un pool par sous-réseau**,
-chacun décrivant la passerelle de *son* VLAN.
-
-| | Pool **VLAN10** | Pool **VLAN20** |
+| Réseau | Adresse | Passerelle |
 |---|---|---|
-| Pool Name | `VLAN10` | `VLAN20` |
-| Default Gateway | `192.168.10.1` | `192.168.20.1` |
-| DNS Server | `172.16.24.11` | `172.16.24.11` |
-| Start IP Address | `192.168.10.100` | `192.168.20.100` |
-| Subnet Mask | `255.255.255.0` | `255.255.255.0` |
-| Maximum Number of Users | `50` | `50` |
+| VLAN 10 (vert) | `192.168.10.0/24` | `Router0` Fa0/0.10 = `192.168.10.1` |
+| VLAN 20 (jaune) | `192.168.20.0/24` | `Router0` Fa0/0.20 = `192.168.20.1` |
+| LAN des serveurs | `172.16.24.0/16` | `Router1` Gig0/1 = `172.16.24.1` |
+| Liaison entre routeurs | `10.6.8.0/30` | `10.6.8.1` ↔ `10.6.8.2` |
 
-`Add` puis `Save` pour chacun des deux pools. On a donc **trois pools** au total :
-`serverPool`, `VLAN10`, `VLAN20`.
+| Équipement | Adresse | Rôle |
+|---|---|---|
+| `DHCP-Server` (ex-`Server0`) | `172.16.24.12` | serveur DHCP (les 3 pools) |
+| `DNS-Server` (ajouté) | `172.16.24.11` | serveur DNS (2 enregistrements `A`) |
+| `Web-Carrillo` (ajouté) | `172.16.24.20` | serveur web `www.carrillo.edu` |
+| `Web-International` (ajouté) | `172.16.24.30` | serveur web `www.international.com` |
 
-> **Pourquoi trois pools et pas un seul ?** Un pool ne contient qu'une adresse de
-> passerelle : elle doit être celle du VLAN du client. À la réception de la requête,
-> Packet Tracer choisit le pool dont le réseau correspond à l'interface d'entrée
-> (`Fa0/0.10` → `192.168.10.0/24` → pool `VLAN10`). C'est aussi comme cela que
-> fonctionne un vrai serveur avec l'option 82 / l'adresse `giaddr`.
->
-> **Ne pas oublier les passerelles** : sans `default gateway` dans le pool, les
-> clients ne pourraient pas sortir de leur VLAN (donc pas de ping vers les autres
-> réseaux, pas d'accès aux serveurs web).
+On renomme le serveur existant en `DHCP-Server` et on ajoute **3 `Server-PT`**
+câblés en câble droit sur les ports libres de `Switch1` (`Fa0/3`, `Fa0/4`, `Fa0/5`).
+
+![Topologie finale](labo/02-topologie-finale.png)
 
 ---
 
-## 3. La « UDP Helper Address » sur le routeur (`ip helper-address`)
+## 1. Configurer le service DHCP pour le réseau 172.16.24.0/16
 
-Le client DHCP ne connaît pas encore l'adresse du serveur : il émet sa requête en
-**broadcast** à l'adresse `255.255.255.255`, et un routeur **n'achemine jamais de
-broadcast** d'un sous-réseau vers un autre. Comme le serveur n'est pas dans le
-VLAN du client, il faut que `Router0` transforme ce broadcast en **unicast** vers
-`172.16.24.12` : c'est le rôle de `ip helper-address`, à mettre **sur chaque
-sous-interface de VLAN** (sous-interface = interface d'entrée des requêtes).
+Le serveur DHCP reçoit une **adresse fixe** `172.16.24.12/16` avec la passerelle
+`172.16.24.1` (c'est un service : il ne peut pas dépendre du DHCP pour son
+adresse).
 
-```console
-pjl509414@univ:~$ ssh Router0        # (ou onglet CLI de Router0 dans Packet Tracer)
+Le service est activé dans l'onglet **Services → DHCP** (*Service : On*), puis on
+crée le pool du réseau des serveurs avec `Add` **puis** `Save`.
 
-Router>enable
-Router#configure terminal
-Router(config)#interface FastEthernet0/0
-Router(config-if)#no shutdown
+| Pool | Default Gateway | DNS Server | Start IP | Subnet Mask |
+|---|---|---|---|---|
+| `serverPool` | 172.16.24.1 | 172.16.24.11 | 172.16.24.100 | 255.255.0.0 |
 
-Router(config-if)#interface FastEthernet0/0.10
-Router(config-subif)#encapsulation dot1Q 10
-Router(config-subif)#ip address 192.168.10.1 255.255.255.0
-Router(config-subif)#ip helper-address 172.16.24.12      ! <-- le DHCP en broadcast
-Router(config-subif)#exit
+## 2. Configurer le serveur pour les deux VLAN
 
-Router(config)#interface FastEthernet0/0.20
-Router(config-subif)#encapsulation dot1Q 20
-Router(config-subif)#ip address 192.168.20.1 255.255.255.0
-Router(config-subif)#ip helper-address 172.16.24.12      ! <-- est relayé ici
-Router(config-subif)#exit
+Comme le serveur DHCP n'est pas dans les VLAN, il faut **un pool par
+sous-réseau** : chaque pool indique la passerelle de *son* VLAN (c'est elle qui
+sera donnée aux postes).
 
-Router(config)#ip routing
-Router(config)#ip route 172.16.0.0 255.255.0.0 10.6.8.2
-Router(config)#interface FastEthernet0/1
-Router(config-if)#ip address 10.6.8.1 255.255.255.252
-Router(config-if)#no shutdown
-Router(config-if)#end
-Router#show ip interface brief
+| Pool | Default Gateway | DNS Server | Start IP | Subnet Mask |
+|---|---|---|---|---|
+| `VLAN10` | 192.168.10.1 | 172.16.24.11 | 192.168.10.100 | 255.255.255.0 |
+| `VLAN20` | 192.168.20.1 | 172.16.24.11 | 192.168.20.100 | 255.255.255.0 |
+
+Les 3 pools sont bien enregistrés sur le serveur.
+
+## 3. Indiquer au routeur la « UDP Helper Address » (`ip helper-address`)
+
+Un poste qui démarre n'a pas encore d'adresse IP : il envoie sa requête DHCP en
+**broadcast** (`255.255.255.255`). Or un routeur **ne transmet jamais un
+broadcast** d'un réseau à un autre. Comme le serveur est sur le réseau
+`172.16.24.0/16`, il faut que `Router0` transforme ce broadcast en **unicast**
+vers `172.16.24.12` : c'est le rôle de `ip helper-address`, à mettre sur **chaque
+sous-interface de VLAN**.
+
+Configuration complète de `Router0` (onglet CLI) :
+
+```
+enable
+configure terminal
+interface FastEthernet0/0
+ no shutdown
+ exit
+interface FastEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+ ip helper-address 172.16.24.12
+ exit
+interface FastEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+ ip helper-address 172.16.24.12
+ exit
+ip routing
+ip route 172.16.0.0 255.255.0.0 10.6.8.2
+interface FastEthernet0/1
+ ip address 10.6.8.1 255.255.255.252
+ no shutdown
+ end
+show ip route
 ```
 
-![Configuration de Router0 (sous-interfaces VLAN, relais DHCP)](screenshots/01-router0-cli.png)
+![Router0 : route statique et vérification](labo/03-router0-cli.png)
 
-Côté `Router1`, on adresse le LAN des serveurs et on met la route par défaut :
+*Remarque : la route statique s'écrit `172.16.0.0` et non `172.16.24.0`, car avec
+le masque `/16` l'adresse du réseau est `172.16.0.0` — sinon IOS refuse la
+commande (`%Inconsistent address and mask`).*
 
-```console
-Router>enable
-Router#configure terminal
-Router(config)#interface GigabitEthernet0/0
-Router(config-if)#ip address 10.6.8.2 255.255.255.252   ! vers Router0 Fa0/1
-Router(config-if)#no shutdown
-Router(config-if)#interface GigabitEthernet0/1
-Router(config-if)#ip address 172.16.24.1 255.255.0.0    ! LAN des serveurs
-Router(config-if)#no shutdown
-Router(config-if)#exit
-Router(config)#ip route 0.0.0.0 0.0.0.0 10.6.8.1
-Router(config)#end
-Router#show ip route
+`Router1` est adressé de la même façon (WAN sur `Gig0/0`, LAN des serveurs sur
+`Gig0/1`) avec une route par défaut :
+
+```
+interface GigabitEthernet0/0
+ ip address 10.6.8.2 255.255.255.252
+ no shutdown
+interface GigabitEthernet0/1
+ ip address 172.16.24.1 255.255.0.0
+ no shutdown
+ip route 0.0.0.0 0.0.0.0 10.6.8.1
 ```
 
-![Configuration de Router1 (LAN des serveurs, route par défaut)](screenshots/02-router1-cli.png)
+![Router1 : interfaces, route par défaut et pings](labo/04-router1-cli.png)
 
-> Les deux routeurs ont besoin d'une route l'un vers l'autre : `Router0` connaît
-> `172.16.24.0/16` par `10.6.8.2`, `Router1` envoie tout le reste à `10.6.8.1` par
-> sa route par défaut. Sans ces deux routes, le relais DHCP n'aboutirait pas
-> (la réponse du serveur ne saurait pas revenir).
-
----
-
-## 4. Vérifier que le serveur distribue bien les adresses
-
-Sur **PC0** (VLAN 20) : `Desktop` → *IP Configuration* → **DHCP**, puis
-`Command Prompt` → `ipconfig /all`.
-
-![PC0 obtient son adresse en DHCP](screenshots/05-pc0-ipconfig.png)
-
-Résultat attendu, VLAN 20 : `192.168.20.100`, masque `255.255.255.0`, passerelle
-`192.168.20.1`, DNS `172.16.24.11`.
-
-Même chose sur **Laptop0** dans le VLAN 10 : `192.168.10.100`, passerelle
-`192.168.10.1`.
-
-Les quatre pings de contrôle demandés :
-
-**a) De PC0 (VLAN 20) vers un poste du VLAN 10** — teste la passerelle et le routage
-inter-VLAN.
-
-**b) De PC0 vers le serveur DHCP `172.16.24.12`** — teste le chemin complet
-VLAN 20 → Router0 → WAN → Router1 → LAN serveurs.
-
-**c) De Laptop0 (VLAN 10) vers le VLAN 20 et vers les serveurs.**
-
-**d) Résolution de nom puis ping** (`ping www.carrillo.edu`) — teste le DNS.
-
-![Pings depuis PC0 (VLAN 20)](screenshots/06-pc0-ping.png)
-
-![Pings depuis Laptop0 (VLAN 10)](screenshots/07-laptop0-ping.png)
-
-> **Ce que ces pings prouvent** : (a) la sous-interface répond et route entre VLAN —
-> sans elle, ni bail DHCP ni ping inter-VLAN ; (b) le relais `ip helper-address`
-> fonctionne *dans les deux sens* (la requête est allée jusqu'au serveur, la
-> réponse est revenue) ; (d) les clients ont bien reçu l'option DNS et le serveur
-> DNS répond.
+Sur cette capture, `Router1` fait `ping 10.6.8.1`, `192.168.10.1` et
+`192.168.20.1` : **100 % de réussite**. Les deux routeurs se connaissent, le
+routage est en place.
 
 ---
 
-## 5. Ajouter les deux serveurs web et le serveur DNS
+## 4. Faire les tests avec différents ping
 
-**a) Adresser les trois serveurs** (Config → FastEthernet0, en statique) :
+On met les 4 postes en **DHCP** (`Desktop → IP Configuration` → *DHCP*) et on
+relève les adresses réellement obtenues :
 
-| Serveur | IP | Masque | Passerelle | Rôle |
-|---------|----|--------|-----------|------|
-| `Server0` (déjà dans la maquette) | `172.16.24.12` | `255.255.0.0` | `172.16.24.1` | **serveur DHCP** (§1) |
-| `DNS Server` (à ajouter) | `172.16.24.11` | `255.255.0.0` | `172.16.24.1` | **serveur DNS** |
-| `Web Server 1` (à ajouter) | `172.16.24.20` | `255.255.0.0` | `172.16.24.1` | `www.carrillo.edu` |
-| `Web Server 2` (à ajouter) | `172.16.24.30` | `255.255.0.0` | `172.16.24.1` | `www.international.com` |
+| Poste | VLAN | Adresse obtenue | Passerelle | DNS |
+|---|---|---|---|---|
+| `PC0` | 20 | `192.168.20.100` | 192.168.20.1 | 172.16.24.11 |
+| `Laptop2` | 20 | `192.168.20.101` | 192.168.20.1 | 172.16.24.11 |
+| `Laptop0` | 10 | `192.168.10.100` | 192.168.10.1 | 172.16.24.11 |
+| `Laptop1` | 10 | `192.168.10.101` | 192.168.10.1 | 172.16.24.11 |
 
-> La maquette de départ ne contient qu'**un** serveur (`Server0`) : il devient le
-> **serveur DHCP** `172.16.24.12`, et l'on **ajoute trois `Server-PT`** (DNS + les
-> deux serveurs web) sur les ports libres de `Switch1` (`Fa0/3`, `Fa0/4`, `Fa0/5`).
-> Le mode opératoire clic par clic est dans
-> **[`EXERCICE-1-etapes-packet-tracer.md`](EXERCICE-1-etapes-packet-tracer.md)**.
+![PC0 : adresse obtenue en DHCP](labo/07-pc0-ipconfig.png)
 
-**b) Activer HTTP sur les deux serveurs web** : *Services* → **HTTP** → `On`, puis
-`Edit` la page d'accueil (`index.html`) de chacun pour qu'on les distingue.
+![Laptop0 : adresse obtenue en DHCP](labo/08-laptop0-ipconfig.png)
 
-**c) Activer DNS** : sur le serveur DNS, *Services* → **DNS** → `On`, puis ajouter
-**un enregistrement de type `A Record` par serveur web** :
+**a) Depuis PC0 (VLAN 20) vers le VLAN 10, vers le serveur DHCP et par nom :**
+
+![Pings depuis PC0](labo/09-pc0-pings.png)
+
+**b) Depuis Laptop0 (VLAN 10) :**
+
+![Pings depuis Laptop0](labo/10-laptop0-pings.png)
+
+**Résultats obtenus :**
+
+| Test | Résultat | Ce que ça démontre |
+|---|---|---|
+| `ping 192.168.10.100` / `.101` | 4 réponses sur 4 | le routage inter-VLAN par les sous-interfaces de `Router0` fonctionne |
+| `ping 172.16.24.12` | 4 sur 4 | toute la chaîne : VLAN → Router0 → WAN → Router1 → LAN des serveurs |
+| `ping www.carrillo.edu` | `Pinging 172.16.24.20` puis 4 sur 4 | le nom a été **résolu par le DNS** avant l'envoi des échos |
+
+Les premiers paquets sont parfois perdus (« Request timed out ») : c'est le temps
+de la résolution ARP et de la table MAC. Les pings suivants passent à 100 %.
+
+---
+
+## 5. Ajouter et activer les serveurs web et le serveur DNS
+
+Chaque serveur est adressé en **statique** avec la passerelle `172.16.24.1`, puis
+le service est activé dans l'onglet **Services** de l'équipement.
+
+### Le serveur DNS
+
+**Services → DNS** → *DNS Service : On*, puis **un `A Record` par serveur web** :
 
 | Name | Type | Address |
-|------|------|---------|
+|---|---|---|
 | `www.carrillo.edu` | A Record | `172.16.24.20` |
 | `www.international.com` | A Record | `172.16.24.30` |
 
-Enfin **`Add` puis `Save`**.
+![Serveur DNS : les deux enregistrements](labo/05-dns-records.png)
 
-![Enregistrements DNS](screenshots/04-dns-records.png)
+### Les serveurs web
 
-**d) Les postes doivent connaître l'adresse du serveur DNS** : c'est le champ
-*DNS Server* de chaque pool DHCP (fait au §2). Côté postes, on peut aussi le voir
-dans *Desktop → IP Configuration* : `DNS Server : 172.16.24.11`.
+**Services → HTTP** → *HTTP : On*, et on remplace le contenu de `index.html` par
+une page qui identifie le serveur (pour bien voir lequel répond) :
+
+```html
+<html>
+  <body>
+    <h1>Carrillo Web Server</h1>
+    <p>www.carrillo.edu - 172.16.24.20</p>
+  </body>
+</html>
+```
+
+![Serveur web : HTTP activé et page modifiée](labo/06-http-serveur.png)
 
 ---
 
-## 6. « Que devez-vous changer au niveau du serveur DHCP ? »
+## 6. Que devez-vous changer au niveau du serveur DHCP ?
 
-**Réponse :** il faut renseigner l'**adresse du serveur DNS** dans **chacun des
-pools** et sauvegarder.
+**Il faut renseigner l'adresse du serveur DNS dans chacun des pools DHCP** (et
+sauvegarder), puis renouveler le bail des postes.
 
-Avant, le champ *DNS Server* du pool valait `0.0.0.0` : les clients recevaient une
-adresse IP, une passerelle et un masque, mais **aucun serveur DNS**. Ils pouvaient
-donc pinguer `172.16.24.20`, mais pas `www.carrillo.edu` — le nom n'était résolu
-nulle part.
+Avant, le champ *DNS Server* des pools valait `0.0.0.0` : les postes recevaient
+une adresse, un masque et une passerelle, mais **aucun serveur DNS**. Ils
+pouvaient donc joindre un serveur **par son adresse IP**, mais pas **par son
+nom** : la résolution échouait.
 
-Depuis que les clients s'adressent à `172.16.24.11` (option 6 du DHCP), la
-résolution de noms fonctionne **sans rien configurer sur chaque poste** : c'est le
-DHCP qui diffuse l'information. En résumé :
+On met donc **DNS Server = `172.16.24.11`** dans les trois pools
+(`serverPool`, `VLAN10`, `VLAN20`) et on clique `Save`.
 
-1. *DNS Server* = `172.16.24.11` dans les pools `VLAN10`, `VLAN20` **et**
-   `serverPool` ;
-2. **Save** après modification ;
-3. sur chaque poste, renouveler le bail (**IP Configuration → DHCP**, ou
-   `ipconfig /renew`) pour récupérer la nouvelle option.
+**La preuve, en images :** sur PC0, `ping 172.16.24.20` (l'IP) répond toujours,
+alors que `ping www.carrillo.edu` (le nom) ne trouve plus l'hôte.
 
-> Si le nom ne se résout toujours pas : vérifier que le serveur DNS est bien `On`,
-> que les deux `A Record` sont enregistrés (**Add** *et* **Save** à chaque fois), et
-> que le poste a bien récupéré `172.16.24.11` comme serveur DNS.
+![Option DNS retirée : le nom ne se résout plus](labo/16-dhcp-sans-dns.png)
+
+Sur cette capture, après `ipconfig /renew` : `ping 172.16.24.20` → **4/4** (l'IP
+fonctionne), et `ping www.carrillo.edu` → **la commande revient sans réponse**
+(le nom n'est résolu par personne). Le problème n'est ni le réseau ni le web,
+mais bien l'**information DNS qui n'est plus transmise par le DHCP**.
+
+C'est tout l'intérêt du DHCP : l'adresse du serveur DNS est diffusée
+**automatiquement à tous les postes**, sans rien configurer sur chacun d'eux.
 
 ---
 
 ## 7. Faire les tests d'accès aux serveurs web
 
-Sur un poste, `Desktop` → **Web Browser**, puis saisir l'URL (avec `http://`, sinon
-Packet Tracer considère la chaîne comme un nom à résoudre) :
+Sur un poste, onglet **Desktop → Web Browser**, on tape l'URL complète (avec
+`http://`).
 
-* `http://www.carrillo.edu` → page du serveur `172.16.24.20` ;
-* `http://www.international.com` → page du serveur `172.16.24.30` ;
-* `ping www.carrillo.edu` depuis la *Command Prompt* → doit afficher
-  `Pinging 172.16.24.20 …` : la preuve que le nom est résolu avant l'envoi des
-  échos ICMP.
+**Test 1 — par adresse IP** (le DNS n'intervient pas) :
 
-![Accès web depuis PC0](screenshots/08-pc0-web.png)
+`http://172.16.24.20` → la page du serveur s'affiche.
 
-![Vérification DNS depuis PC0](screenshots/09-dns-verify.png)
+**Test 2 — par nom** (le DNS intervient) :
 
-Trois niveaux de test, du plus simple au plus complet :
+`http://www.carrillo.edu` → la même page :
 
-| Test | Ce qu'il valide |
-|------|-----------------|
-| `ping 172.16.24.20` | routage jusqu'au serveur web |
-| `ping www.carrillo.edu` | routage **+** résolution DNS |
-| Web Browser sur l'URL | routage + DNS + HTTP (port 80) + page servie |
+![PC0 : accès à www.carrillo.edu dans le navigateur](labo/11-pc0-web-carrillo.png)
+
+**Test 3 — vérification de la résolution de noms** depuis la *Command Prompt* :
+
+```
+ping www.international.com
+ping www.carrillo.edu
+```
+
+![PC0 : résolution des deux noms](labo/12-pc0-dns-verify.png)
+
+Packet Tracer affiche avant le ping l'adresse trouvée :
+`Pinging 172.16.24.30` pour `www.international.com` et `Pinging 172.16.24.20`
+pour `www.carrillo.edu`. **Les deux noms sont donc bien résolus par le serveur
+DNS `172.16.24.11`**, puis les échos ICMP partent vers les serveurs web.
+
+*Remarque : on voit aussi sur ces captures ce qui se passe quand le DNS est
+éteint — `ping www.carrillo.edu` renvoie « Ping request could not find host »
+alors que `http://172.16.24.20` continue de fonctionner :*
+
+![Le nom échoue sans DNS](labo/15-ping-nom-echoue.png)
+
+![Service DNS éteint](labo/13-dns-service-off.png)
+
+![Le navigateur ne résout plus le nom](labo/14-dns-host-unresolved.png)
+
+![Le navigateur ne trouve plus l'hôte non plus](labo/17-web-sans-dns-echoue.png)
+
+![Le site par IP reste accessible sans DNS](labo/18-web-par-ip-sans-dns.png)
+
+Ces captures montrent bien la **différence entre tester par adresse IP et tester
+par nom** : la panne du DNS n'empêche pas l'accès direct par IP, elle empêche
+seulement la traduction nom → adresse.
 
 ---
 
-## 8. « Séparez le serveur Web du serveur DNS. Qu'est-ce que cela change ? »
+## 8. Séparez le serveur Web du serveur DNS. Qu'est-ce que cela change ?
 
-**Réponse :** dans ce cas, la machine qui répond au HTTP (port **80/TCP**) et celle
-qui répond à la résolution de noms (port **53/UDP**) sont deux machines distinctes,
-avec **deux adresses IP différentes**.
+**Réponse : cela fait deux machines distinctes — `172.16.24.11` pour la
+résolution des noms, `172.16.24.20` et `172.16.24.30` pour les pages web.**
 
-Ce que cela change concrètement :
+Dans la maquette, les rôles sont déjà séparés : le DNS est sur un serveur et les
+sites web sur deux autres. Ce que cela change :
 
-1. **Configuration** : le serveur DNS n'a plus besoin du service HTTP ; à l'inverse
-   les serveurs web n'ont plus besoin du service DNS. Les enregistrements `A`
-   pointent toujours vers les serveurs web — c'est le seul lien entre les deux.
-2. **Côté clients** : rien à changer, c'est le champ *DNS Server* du pool DHCP qui
-   désigne la machine DNS : on peut donc changer de serveur DNS sans toucher aux
-   postes.
-3. **Disponibilité** : c'est l'intérêt principal. Si le serveur DNS tombe, les noms
-   ne se résolvent plus, **mais les pages restent accessibles par adresse IP** ; si
-   c'est le serveur web qui tombe, les autres services et la résolution continuent.
-   Sur une seule machine, la panne (ou une surcharge) coupe **tout** à la fois.
-4. **Performance et sécurité** : les requêtes DNS sont très nombreuses et très
-   courtes, les transferts HTTP volumineux ; les séparer évite qu'ils se gênent. On
-   peut aussi filtrer/limiter chacun séparément. En contrepartie : deux machines à
-   administrer et deux adresses IP à réserver, au lieu d'une.
+1. **Les services sont indépendants.** On l'a vérifié en éteignant le DNS : les
+   noms ne se résolvent plus, mais `http://172.16.24.20` continue de fonctionner.
+   Inversement, si un serveur web tombe, le DNS continue de répondre. Avec un
+   seul serveur pour tout, la moindre panne coupe **tous** les services d'un coup.
+2. **La disponibilité et la charge.** Le DNS reçoit beaucoup de requêtes très
+   courtes ; le HTTP transfère de gros volumes. Séparer évite qu'ils se
+   ralentissent mutuellement, et on peut limiter ou filtrer chacun séparément.
+3. **La configuration côté clients ne change pas** : le navigateur et le système
+   interrogent simplement le serveur DNS reçu par DHCP, que celui-ci soit sur la
+   même machine que le serveur web ou non.
+4. **En contrepartie**, il faut administrer deux (ou trois) machines et réserver
+   autant d'adresses IP fixes — c'est le prix de cette séparation.
 
-> C'est exactement la logique du/des serveurs du TP : `172.16.24.11` pour le DNS,
-> `172.16.24.20` et `172.16.24.30` pour le web. Le TP le fait d'ailleurs dans cet
-> ordre : d'abord un serveur qui cumule DNS + web pour comprendre les rôles, puis
-> la séparation — les enregistrements DNS ne changent pas, seul l'équipement qui les
-> porte change.
+En résumé : séparer le web du DNS **augmente la disponibilité et la clarté** des
+services ; cela ne change rien pour les postes, qui utilisent toujours l'adresse
+IP du DNS fournie par le DHCP pour la résolution et l'URL pour l'accès web.
 
 ---
 
 # Partie II — Telnet
 
-Les deux questions portent sur `FichiersPacketTracer/telnet.cap`, une capture
-réalisée lors d'une connexion au serveur `babord.u-bordeaux.fr` (le catalogue des
-bibliothèques des universités de Bordeaux).
+## 1. Quel est le protocole de transport utilisé pour cette connexion telnet ?
 
-## 1. Quel protocole de transport est utilisé pour cette connexion ?
-
-**Réponse : TCP**, sur le **port 23** (le port standard de Telnet).
-
-Le fichier est une capture *libpcap* ; on peut l'analyser sans Wireshark, en
-listant d'abord les conversations qui s'y trouvent :
-
-```console
-pjl509414@univ:~$ python3 outils/cap.py flows FichiersPacketTracer/telnet.cap
-SOURCE                 DESTINATION            PROTO  PAQUETS     OCTETS
-138.96.241.88:1823     147.210.36.101:23      TCP        178      39753
-
-1 conversation(s)
-```
-
-![Conversations de telnet.cap](screenshots/10-telnet-flows.png)
-
-La capture ne contient **qu'un seul échange** : `TCP` entre le client et le serveur
-port **23**. Telnet a besoin d'une transmission **fiable, ordonnée et connectée**
-(il doit être sûr que chaque caractère tapé arrive, dans le bon ordre, sans perte) :
-c'est une application *interactive* classique, donc **TCP** et non UDP. Le protocole
-possède en outre tout un mécanisme de **négociation d'options** entre client et
-serveur (fenêtre, type de terminal, mode caractère/écho), visible au début de la
-capture : ce dialogue n'aurait aucun sens sans connexion établie — on voit les
-paquets `SYN`, `SYN-ACK`, `ACK` de l'ouverture et les `FIN` de la fermeture.
+**TCP, sur le port 23** (le port par défaut de Telnet).
 
 ## 2. Quelles sont les adresses IP du client et du serveur ?
 
-**Réponse :**
+| Rôle | Adresse IP | Port |
+|---|---|---|
+| **Client** | `138.96.241.88` | `1823` (port éphémère) |
+| **Serveur** | `147.210.36.101` | `23` |
 
-| Rôle | Adresse IP | Port | Qui c'est |
-|------|-----------|------|-----------|
-| **Client** | `138.96.241.88` | `1823` | le poste de l'utilisateur (port **éphémère**, tiré au hasard par le système) |
-| **Serveur** | `147.210.36.101` | `23` | `babord.u-bordeaux.fr`, le serveur des bibliothèques de Bordeaux |
+## 3. Quelles sont les informations qu'a consultées le client ? Filtre `ip.dst == 138.96.41.88`
 
-> **Attention, il y a une coquille dans l'énoncé :** la question 3 demande de faire
-> le filtre `ip.dst == 138.96.41.88`, alors que l'adresse réelle du client dans la
-> capture est **`138.96.241.88`**. En tapant l'adresse de l'énoncé, Wireshark
-> n'afficherait **rien** ; avec la bonne adresse, 126 paquets apparaissent.
+*Remarque : dans la capture l'adresse du client est `138.96.241.88` (avec **241**)
+— le filtre de l'énoncé (`138.96.41.88`) ne sélectionne aucun paquet.*
 
-## 3. Quelles informations le client a-t-il consultées ? (filtre `ip.dst == 138.96.241.88`)
+Le filtre `ip.dst == 138.96.241.88` garde tous les paquets **reçus par le
+client** : c'est exactement ce que le serveur lui a renvoyé, donc ce que le
+client a consulté. La session Telnet est transmise **en clair**, on peut donc
+lire tout son contenu.
 
-Le filtre `ip.dst` garde tous les paquets qui **arrivent au client**, c'est-à-dire
-tout ce que le serveur lui a envoyé : c'est exactement « ce que le client a
-consulté ».
+**Les informations consultées, dans l'ordre :**
 
-```console
-pjl509414@univ:~$ python3 outils/cap.py filter FichiersPacketTracer/telnet.cap \
-                          "ip.dst == 138.96.241.88"
-16:30:27.670223 IP 147.210.36.101.23 > 138.96.241.88.1823: Flags [ACK,PSH], seq, length 3
-16:30:27.681345 IP 147.210.36.101.23 > 138.96.241.88.1823: Flags [ACK,PSH], seq, length 9
-16:30:27.864495 IP 147.210.36.101.23 > 138.96.241.88.1823: Flags [ACK,PSH], seq, length 6
-16:30:27.896087 IP 147.210.36.101.23 > 138.96.241.88.1823: Flags [ACK,PSH], seq, length 40
-16:30:27.913966 IP 147.210.36.101.23 > 138.96.241.88.1823: Flags [ACK,PSH], seq, length 130
-...
-
-126 paquet(s) correspondant(s) sur 178 paquet(s) analysé(s)
-```
-
-![Résultat du filtre ip.dst](screenshots/11-telnet-filter.png)
-
-Puis, en reconstituant le flux TCP dans l'ordre des numéros de séquence, tout le
-contenu applicatif apparaît — **en clair** :
-
-![La session Telnet, en clair](screenshots/12-telnet-session.png)
-
-**Les informations consultées, dans l'ordre chronologique de la session :**
-
-1. **L'ouverture de la connexion** (en-tête de la ligne Telnet) :
-   `telnet (frbdx13)` puis `AIX version 4` / `(C) Copyrights by IBM and by others
-   1982, 1996.` → le serveur est une machine **IBM AIX 4.x** (l'équivalent Unix
-   d'IBM).
-2. **L'identification de l'utilisateur** : `Connexion: grace` → le login saisi est
-   **`grace`**, et `Dernière connexion: jeu 21 fév 17:01:53 NFT 2008 le /dev/pts/0
-   à partir de bougeotte.inria.fr` → date et poste d'origine de la connexion
-   précédente (une machine de l'INRIA).
-3. **L'application consultée** : **GRACE** (*Gestion du Réseau Automatisé de
-   Catalogues En-ligne*), logiciel documentaire des bibliothèques universitaires de
-   Bordeaux (BABORD), avec sa bannière « BIENVENUE chez GRACE », la version
-   `3.60` et l'heure `21/02/2008 - 17:04`.
-4. **Le catalogue / les pages lues**, grâce aux touches tapées par l'utilisateur :
-   `A` (AIDE en ligne, 3 pages : *GENERALITES 1/3*, *2/3*, *AIDE GENERALE 3/3*),
-   `S`/`R`/`I`/`J` (navigation), puis `F` et `Q` (quitter) ;
-   puis **B.I.P.E.D.** (*Bulletin d'Information pour Étudiants en Détresse*) et ses
-   rubriques : **L'INFORMATIQUE à la B.U.**, **L'AVENIR INFORMATIQUE**,
-   **G.R.A.C.E**, **G.R.A.C.E (suite)**, **SIBIL** (système informatisé de gestion
-   des bibliothèques), **Les MICRO-ORDINATEURS pour la R.D.I.** ;
-5. Enfin **le JOURNAL** — « DERNIERES NOUVELLES de GRACE », puis la sortie :
-   « GRACE vous remercie de votre visite » et l'horloge du serveur
-   (`17:05:41`).
-
-![Les pages consultées dans la session](screenshots/13-telnet-pages.png)
-
-**Ce que l'utilisateur a tapé** (le sens client → serveur, seulement **117 octets**
-au total) : `grace` (le login), `A`, `S`, `R`, `I`, `J`, `F`, `Q` et une dizaine de
-fins de ligne. La session se lit donc intégralement, **y compris la saisie du mot
-de passe** s'il y en avait un — ici il n'y a pas de `Password:` dans la trace, le
-compte est passé directement.
+1. l'en-tête de la ligne Telnet `telnet (frbdx13)` puis `AIX version 4` /
+   `(C) Copyrights by IBM and by others 1982, 1996.` → le serveur est une
+   machine **IBM AIX 4** ;
+2. `Connexion: grace` → le **nom d'utilisateur** est `grace` ; puis la
+   `Dernière connexion: jeu 21 fév 17:01:53 NFT 2008 le /dev/pts/0 à partir de
+   bougeotte.inria.fr` (date et poste de la connexion précédente) ;
+3. la bannière de l'application **GRACE** (*Gestion du Réseau Automatisé de
+   Catalogues En-ligne*), version 3.60, le `21/02/2008 - 17:04`, et son menu
+   (AIDE, JOURNAL, INFORMATION, QUITTER) ;
+4. l'**aide en ligne** en 3 pages (`GENERALITES 1/3`, `2/3`, `AIDE GENERALE 3/3`)
+   — le client a tapé `A` ;
+5. le **B.I.P.E.D.** (*Bulletin d'Information pour Étudiants en Détresse*) et ses
+   rubriques : `L'INFORMATIQUE à la B.U.`, `L'AVENIR INFORMATIQUE`, `G.R.A.C.E`,
+   `G.R.A.C.E (suite)`, `SIBIL`, `Les MICRO-ORDINATEURS pour la R.D.I.` ;
+6. le **JOURNAL** (« DERNIERES NOUVELLES de GRACE ») puis la page de sortie
+   « GRACE vous remercie de votre visite » avec l'horloge du serveur `17:05:41`.
 
 ## 4. Expliquez le résultat obtenu
 
-**Pourquoi 126 paquets sur 178 vont-ils vers le client ?** Parce que le serveur ne
-fait rien d'autre que de lui **renvoyer ce qu'il doit afficher** :
+Ce sont des **informations textuelles** du catalogue documentaire qui circulent
+en clair : rien n'est chiffré.
 
-* **l'écho** : en mode caractère, le serveur renvoie **chaque touche** au fur et à
-  mesure de la frappe. C'est ce que montrent les paquets de `length 1` : `g`, `r`,
-  `a`, `c`, `e`… un paquet par caractère ;
-* **les pages** : chaque écran de l'application (menus, aide, journal) est envoyé
-  en bloc, avec les codes de positionnement du terminal (`ESC[2J` pour effacer
-  l'écran, `ESC[1;1H` pour repositionner le curseur, `ESC[5m` pour le
-  clignotement…). Ce sont ces séquences ANSI/VT100 que l'analyse a retirées pour
-  rendre les pages lisibles ;
-* **les acquittements** (`ACK`) : TCP confirme la réception de chaque segment.
+- Sur 178 paquets, **126 vont vers le client** : le serveur renvoie tout ce qu'il
+  affiche, plus l'**écho de chaque caractère** tapé (les paquets d'un seul octet
+  `g`, `r`, `a`, `c`… quand l'utilisateur saisit `grace`) et les acquittements
+  TCP. C'est le **terminal** de l'utilisateur qui est renvoyé à distance, écran
+  par écran.
+- Le client, lui, n'a envoyé que **117 octets** au total : son login, ses
+  quelques touches (`A`, `S`, `R`, `I`, `J`, `F`, `Q`) et les retours de ligne.
+- Les pages contiennent des **codes de commande du terminal** (couleurs,
+  positionnement du curseur, effacement d'écran) : en les retirant, on lit
+  exactement ce que l'utilisateur avait à l'écran.
 
-**Ce que cela démontre sur le plan de la sécurité :** Telnet transporte **tout en
-clair** — le login, les frappes, les menus, les données affichées. Sur un réseau
-réel, **une simple capture** (ou un `tcpdump`) permet donc de reconstituer une
-session complète et de récupérer un mot de passe : c'est la raison pour laquelle
-Telnet doit être remplacé par **SSH** (partie III), qui chiffre toute la session.
-Packet Tracer permet de simuler la vérification, mais aussi la **remise en clair**
-(`tcpdump` effectué sur le lien) : le TP l'illustre exactement.
+**Conclusion :** Telnet transmet **tout en clair** — jusqu'au mot de passe. Une
+simple capture réseau suffit donc à reconstituer une session et à récupérer des
+identifiants : c'est la raison pour laquelle Telnet est remplacé par **SSH**.
 
 ---
 
 # Partie III — SSH
 
-## 1. À quel serveur le client s'est-il connecté ?
+## 1. À quel serveur s'est connecté le client ?
 
-**Réponse :** au serveur **`134.59.22.22`**, port **22** (le port standard de SSH).
+Au serveur **`134.59.22.22`, port 22**, d'après la première chaîne envoyée par
+le serveur : `SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6`. Le client, lui, utilise
+le port éphémère `1869`.
 
-On le voit dans les conversations de la capture, et surtout dans la première chaîne
-que le serveur envoie, en clair, avant le chiffrement :
+## 2. Le client a-t-il utilisé un logiciel ? Si oui, lequel ?
 
-```console
-pjl509414@univ:~$ python3 outils/cap.py flows FichiersPacketTracer/ssh.cap
-SOURCE                 DESTINATION            PROTO  PAQUETS     OCTETS
-138.96.241.55:139      138.96.241.88:4233     TCP         52      31280
-131.254.254.41:36981   138.96.146.5:10000     TCP          1         60
-138.195.130.71:80      138.96.241.88:1868     TCP          4        160
-134.59.22.22:22        138.96.241.88:1869     TCP        319     144537
-138.96.32.250          224.0.0.13             proto 103        2        108
-131.254.254.41:37073   138.96.146.5:10000     TCP          1         60
-138.96.241.88:1874     193.51.224.22:80       TCP         11       3618
-138.96.0.39:80         138.96.219.36:4807     TCP          3        620
-138.96.32.250          224.0.0.4              proto 2        1        199
+**Oui : PuTTY release 0.58.** La chaîne d'identification du client est
+`SSH-2.0-PuTTY_Release_0.58`, affichée en clair au début de la session.
 
-9 conversation(s)
-```
+## 3. Quelles sont les informations qui circulent ? Commenter.
 
-![Conversations de ssh.cap](screenshots/14-ssh-flows.png)
+**a) Avant le chiffrement, tout est lisible** : les deux programmes s'annoncent
+(`SSH-2.0-PuTTY_Release_0.58` côté client, `SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6`
+côté serveur) et **négocient les algorithmes** :
 
-```console
-SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6
-```
-
-→ le serveur est `134.59.22.22` (`ssh://134.59.22.22:22`), une machine **Linux
-Debian (sarge)** faisant tourner **OpenSSH 3.8.1p1**. Le client, lui, utilise le
-port éphémère **1869**.
-
-> La capture contient aussi d'autres échanges, sans rapport avec SSH : une session
-> NetBIOS (`138.96.241.55:139` → `138.96.241.88:4233`), une requête HTTP
-> `GET /aum.crl` vers `193.51.224.22:80` émise par **Adobe Update Manager 5**, et
-> une requête vers `138.96.0.39:80`. C'est normal : on capture l'interface, pas
-> seulement la connexion SSH.
-
-## 2. Le client a-t-il utilisé un logiciel pour la connexion ? Si oui, lequel ?
-
-**Réponse : oui — PuTTY, version 0.58** (sous Windows).
-
-La chaîne d'identification envoyée par le client est :
-
-```console
-SSH-2.0-PuTTY_Release_0.58
-```
-
-Elle est lisible **en clair** dans la capture (les trois lignes
-`SSH-2.0-…`, échangées avant la mise en place du chiffrement) :
-
-![Bannières et algorithmes négociés](screenshots/15-ssh-banners.png)
-
-| Élément | Client | Serveur |
-|---------|--------|---------|
-| Logiciel | **PuTTY release 0.58** | **OpenSSH 3.8.1p1** |
-| Système | Windows (PuTTY) | Debian GNU/Linux (sarge) |
-| Adresse | `138.96.241.88`, port `1869` | `134.59.22.22`, port `22` |
-
-## 3. Quelles informations voyez-vous circuler ? Commenter.
-
-**Deux phases bien distinctes :**
-
-**(a) Avant le chiffrement — tout est lisible.** L'identification des logiciels et
-la **négociation des algorithmes** :
-
-* échange de clés (*key exchange*) :
-  `diffie-hellman-group-exchange-sha1`, `diffie-hellman-group14-sha1`,
-  `diffie-hellman-group1-sha1` ;
-* authentification du serveur (clés d'hôte) : `ssh-rsa`, `ssh-dss` ;
-* chiffrement retenu : `aes256-cbc`, `aes192-cbc`, `aes128-cbc`, `3des-cbc`,
+* échange de clés : `diffie-hellman-group-exchange-sha1`,
+  `diffie-hellman-group14-sha1`, `diffie-hellman-group1-sha1` ;
+* clés d'hôte : `ssh-rsa`, `ssh-dss` ;
+* chiffrement : `aes256-cbc`, `aes192-cbc`, `aes128-cbc`, `3des-cbc`,
   `blowfish-cbc`, `arcfour`… ;
-* intégrité : `hmac-sha1`, `hmac-md5`, `hmac-ripemd160` ;
+* intégrité : `hmac-sha1`, `hmac-md5` ;
 * compression : `none`, `zlib`.
 
-**(b) Après le `NEWKEYS` — plus rien n'est lisible.** Le reste de la session
-(authentification de l'utilisateur, mot de passe, commandes, résultats) est
-**chiffré** : on ne voit que des octets pseudo-aléatoires.
+**b) Après l'échange de clés, plus rien n'est lisible** : l'authentification de
+l'utilisateur, le mot de passe et les commandes sont **chiffrés**.
 
-![Le flux SSH après la négociation : illisible](screenshots/16-ssh-encrypted.png)
+**Commentaire :** c'est la différence essentielle avec Telnet. SSH **chiffre**
+toute la session (ici AES ou 3DES) et **vérifie son intégrité** (HMAC), donc une
+capture ne permet plus de lire ce qui circule — seul l'entête de négociation
+reste visible. Les informations deviennent illisibles : on ne voit que des
+octets pseudo-aléatoires.
 
-**Commentaire.** C'est **exactement la différence entre Telnet et SSH** :
-
-| | Telnet (II) | SSH (III) |
+| | Telnet | SSH |
 |---|---|---|
 | Port | 23 | 22 |
-| Contenu de la session | **tout en clair** (login, mot de passe, données) | **chiffré** dès après la négociation |
-| Ce qu'on peut lire dans une capture | toute la session | uniquement les bannières et la liste des algorithmes |
-| Risque | écoute passive = vol d'identifiants | échange chiffré + authentifié (intégrité) |
+| Session | **en clair** | **chiffrée** après la négociation |
+| Ce qu'on lit dans une capture | login, mot de passe, menus, données | seulement les bannières et la liste des algorithmes |
 
-SSH met en place un **canal chiffré** (ici AES ou 3DES) et **authentifié**
-(HMAC + clé d'hôte) : même si quelqu'un capture le trafic, il ne peut ni lire, ni
-modifier la session sans être détecté. C'est pourquoi **SSH remplace**
-avantageusement `telnet`, `rlogin`, `rsh` et `ftp` (devenu `sftp`/`scp`).
-
-Les seules informations qui « fuient » restent de nature **métadonnées** :
-l'adresse du serveur, le port, et les versions des logiciels (utiles pour… savoir si
-une version obsolète est utilisée, comme ici OpenSSH 3.8.1 de 2005).
+C'est pourquoi on utilise SSH plutôt que Telnet (et `sftp`/`scp` plutôt que
+`ftp`) : la confidentialité et l'intégrité de la session sont assurées.
 
 ---
 
-# Annexe — les commandes utilisées
+# Annexe — comment les captures ont été prises
 
-Tout a été fait depuis le terminal, avec les outils du dépôt `outils/` (aucune
-dépendance, Python 3 standard) :
+* **Partie I** : Packet Tracer, enregistrements d'écran
+  (`Windows + Maj + S`) des onglets `CLI`, `Services` et `Desktop` des
+  équipements, déposés dans `TP7/labo/`.
+* **Parties II et III** : la capture `telnet.cap` / `ssh.cap` a été analysée en
+  ligne de commande, ce qui permet de reconstituer les flux TCP :
 
-```bash
-# Lire la maquette sans Packet Tracer : équipements, modèles, ports, IP, configs
-python3 outils/pkt.py devices FichiersPacketTracer/IUT_TP_LAYER7_AConfigurer.pkt
-python3 outils/pkt.py configs FichiersPacketTracer/IUT_TP_LAYER7_AConfigurer.pkt --running-only
-
-# Extraire le XML complet d'une maquette (et le remettre au format .pkt)
-python3 outils/pkt.py decode FichiersPacketTracer/IUT_TP_LAYER7_AConfigurer.pkt -o tp7.xml
-python3 outils/pkt.py encode tp7.xml -o tp7.pkt
-
-# Comprendre / vérifier / modifier un .pkt
-python3 outils/pkt.py check  maquette.pkt
-python3 outils/pkt.py edit   maquette.pkt --replace "hostname Switch" --with "hostname SW1" -o modifie.pkt
-
-# Analyser les captures réseau
+```
 python3 outils/cap.py flows  FichiersPacketTracer/telnet.cap
 python3 outils/cap.py filter FichiersPacketTracer/telnet.cap "ip.dst == 138.96.241.88"
 python3 outils/cap.py follow FichiersPacketTracer/telnet.cap \
-                  --client 138.96.241.88:1823 --server 147.210.36.101:23
+        --client 138.96.241.88:1823 --server 147.210.36.101:23
 python3 outils/cap.py text   FichiersPacketTracer/ssh.cap --max-strings 8
-
-# Tout vérifier d'un coup
-python3 outils/selftest.py
 ```
 
-Sous **Wireshark**, les équivalents des commandes ci-dessus sont :
-
-| Commande du terminal | Dans Wireshark |
-|----------------------|----------------|
-| `cap.py flows` | *Statistics → Conversations → TCP* |
-| `cap.py filter "ip.dst == 138.96.241.88"` | barre de filtre : `ip.dst == 138.96.241.88` |
-| `cap.py follow …` | clic droit sur un paquet → *Follow → TCP Stream* |
-| `cap.py text ssh.cap` | *Analyze → Follow → TCP Stream* (ou `tcp.stream eq N`) |
-
----
-
-*Document rédigé pour le TP7 « Applications » — les captures de terminal sont des
-sorties réelles ; les captures Packet Tracer sont des reconstitutions fidèles des
-écrans, produites par `TP7/make_screenshots.py` (voir la note en tête de document).*
+Sous Wireshark, l'équivalent est *Statistics → Conversations* pour la liste des
+conversations, la barre de filtre `ip.dst == …` pour la sélection des paquets, et
+*Follow → TCP Stream* pour la reconstitution d'une session.
