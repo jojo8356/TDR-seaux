@@ -1,18 +1,12 @@
-# TP7 — Applications : réponses
+# TP7 — Applications
 
-**Architecture des réseaux — R3.06 — IUT Nice Côte d'Azur**
-**`pjl509414@univ`**
-
-Ce document répond aux questions du sujet *TD/TP Réseaux n°7 : Applications*.
-Les six sections de la partie I sont la configuration de la maquette
-`IUT_TP_LAYER7_AConfigurer.pkt` dans Packet Tracer ; les parties II et III sont
-l'analyse des captures `telnet.cap` et `ssh.cap` faites depuis le terminal.
+**Johan Polsinelli — BUT2 Informatique**
 
 ---
 
 # Partie I — DHCP, HTTP et DNS
 
-## 0. Ce qu'on part de la maquette et ce qu'on ajoute
+## 0. Topologie et plan d'adressage
 
 ![Topologie de départ](labo/01-topologie-depart.png)
 
@@ -67,7 +61,6 @@ sera donnée aux postes).
 | `VLAN10` | 192.168.10.1 | 172.16.24.11 | 192.168.10.100 | 255.255.255.0 |
 | `VLAN20` | 192.168.20.1 | 172.16.24.11 | 192.168.20.100 | 255.255.255.0 |
 
-Les 3 pools sont bien enregistrés sur le serveur.
 
 ## 3. Indiquer au routeur la « UDP Helper Address » (`ip helper-address`)
 
@@ -107,10 +100,6 @@ show ip route
 
 ![Router0 : route statique et vérification](labo/03-router0-cli.png)
 
-*Remarque : la route statique s'écrit `172.16.0.0` et non `172.16.24.0`, car avec
-le masque `/16` l'adresse du réseau est `172.16.0.0` — sinon IOS refuse la
-commande (`%Inconsistent address and mask`).*
-
 `Router1` est adressé de la même façon (WAN sur `Gig0/0`, LAN des serveurs sur
 `Gig0/1`) avec une route par défaut :
 
@@ -125,10 +114,6 @@ ip route 0.0.0.0 0.0.0.0 10.6.8.1
 ```
 
 ![Router1 : interfaces, route par défaut et pings](labo/04-router1-cli.png)
-
-Sur cette capture, `Router1` fait `ping 10.6.8.1`, `192.168.10.1` et
-`192.168.20.1` : **100 % de réussite**. Les deux routeurs se connaissent, le
-routage est en place.
 
 ---
 
@@ -163,9 +148,6 @@ relève les adresses réellement obtenues :
 | `ping 192.168.10.100` / `.101` | 4 réponses sur 4 | le routage inter-VLAN par les sous-interfaces de `Router0` fonctionne |
 | `ping 172.16.24.12` | 4 sur 4 | toute la chaîne : VLAN → Router0 → WAN → Router1 → LAN des serveurs |
 | `ping www.carrillo.edu` | `Pinging 172.16.24.20` puis 4 sur 4 | le nom a été **résolu par le DNS** avant l'envoi des échos |
-
-Les premiers paquets sont parfois perdus (« Request timed out ») : c'est le temps
-de la résolution ARP et de la table MAC. Les pings suivants passent à 100 %.
 
 ---
 
@@ -216,18 +198,17 @@ nom** : la résolution échouait.
 On met donc **DNS Server = `172.16.24.11`** dans les trois pools
 (`serverPool`, `VLAN10`, `VLAN20`) et on clique `Save`.
 
-**La preuve, en images :** sur PC0, `ping 172.16.24.20` (l'IP) répond toujours,
-alors que `ping www.carrillo.edu` (le nom) ne trouve plus l'hôte.
+**Test avec l'option DNS retirée du pool** : sur PC0, après `ipconfig /renew` :
+
+```
+ping 172.16.24.20        ->  4/4 : l'adresse IP répond toujours
+ping www.carrillo.edu    ->  le nom n'est plus résolu
+```
 
 ![Option DNS retirée : le nom ne se résout plus](labo/16-dhcp-sans-dns.png)
 
-Sur cette capture, après `ipconfig /renew` : `ping 172.16.24.20` → **4/4** (l'IP
-fonctionne), et `ping www.carrillo.edu` → **la commande revient sans réponse**
-(le nom n'est résolu par personne). Le problème n'est ni le réseau ni le web,
-mais bien l'**information DNS qui n'est plus transmise par le DHCP**.
-
-C'est tout l'intérêt du DHCP : l'adresse du serveur DNS est diffusée
-**automatiquement à tous les postes**, sans rien configurer sur chacun d'eux.
+L'adresse du serveur DNS est diffusée **automatiquement à tous les postes** par
+le DHCP, sans rien configurer sur chacun d'eux.
 
 ---
 
@@ -260,24 +241,6 @@ Packet Tracer affiche avant le ping l'adresse trouvée :
 pour `www.carrillo.edu`. **Les deux noms sont donc bien résolus par le serveur
 DNS `172.16.24.11`**, puis les échos ICMP partent vers les serveurs web.
 
-*Remarque : on voit aussi sur ces captures ce qui se passe quand le DNS est
-éteint — `ping www.carrillo.edu` renvoie « Ping request could not find host »
-alors que `http://172.16.24.20` continue de fonctionner :*
-
-![Le nom échoue sans DNS](labo/15-ping-nom-echoue.png)
-
-![Service DNS éteint](labo/13-dns-service-off.png)
-
-![Le navigateur ne résout plus le nom](labo/14-dns-host-unresolved.png)
-
-![Le navigateur ne trouve plus l'hôte non plus](labo/17-web-sans-dns-echoue.png)
-
-![Le site par IP reste accessible sans DNS](labo/18-web-par-ip-sans-dns.png)
-
-Ces captures montrent bien la **différence entre tester par adresse IP et tester
-par nom** : la panne du DNS n'empêche pas l'accès direct par IP, elle empêche
-seulement la traduction nom → adresse.
-
 ---
 
 ## 8. Séparez le serveur Web du serveur DNS. Qu'est-ce que cela change ?
@@ -301,9 +264,19 @@ sites web sur deux autres. Ce que cela change :
 4. **En contrepartie**, il faut administrer deux (ou trois) machines et réserver
    autant d'adresses IP fixes — c'est le prix de cette séparation.
 
-En résumé : séparer le web du DNS **augmente la disponibilité et la clarté** des
-services ; cela ne change rien pour les postes, qui utilisent toujours l'adresse
-IP du DNS fournie par le DHCP pour la résolution et l'URL pour l'accès web.
+**Vérification dans la maquette** — avec le service DNS éteint sur `DNS-Server` :
+
+![Service DNS éteint](labo/13-dns-service-off.png)
+
+![Le nom échoue : ping](labo/15-ping-nom-echoue.png)
+
+![Le nom échoue : navigateur](labo/14-dns-host-unresolved.png)
+
+![Le nom échoue : navigateur, autre poste](labo/17-web-sans-dns-echoue.png)
+
+Alors que l'accès par adresse IP continue de fonctionner :
+
+![Le site par IP reste accessible sans DNS](labo/18-web-par-ip-sans-dns.png)
 
 ---
 
@@ -321,9 +294,6 @@ IP du DNS fournie par le DHCP pour la résolution et l'URL pour l'accès web.
 | **Serveur** | `147.210.36.101` | `23` |
 
 ## 3. Quelles sont les informations qu'a consultées le client ? Filtre `ip.dst == 138.96.41.88`
-
-*Remarque : dans la capture l'adresse du client est `138.96.241.88` (avec **241**)
-— le filtre de l'énoncé (`138.96.41.88`) ne sélectionne aucun paquet.*
 
 Le filtre `ip.dst == 138.96.241.88` garde tous les paquets **reçus par le
 client** : c'est exactement ce que le serveur lui a renvoyé, donc ce que le
@@ -401,11 +371,10 @@ côté serveur) et **négocient les algorithmes** :
 **b) Après l'échange de clés, plus rien n'est lisible** : l'authentification de
 l'utilisateur, le mot de passe et les commandes sont **chiffrés**.
 
-**Commentaire :** c'est la différence essentielle avec Telnet. SSH **chiffre**
-toute la session (ici AES ou 3DES) et **vérifie son intégrité** (HMAC), donc une
-capture ne permet plus de lire ce qui circule — seul l'entête de négociation
-reste visible. Les informations deviennent illisibles : on ne voit que des
-octets pseudo-aléatoires.
+C'est toute la différence avec Telnet : SSH **chiffre** la session (ici AES ou
+3DES) et **vérifie son intégrité** (HMAC), donc une capture ne permet plus de
+lire ce qui circule — seul l'entête de négociation reste visible, le reste
+apparaît comme des octets pseudo-aléatoires.
 
 | | Telnet | SSH |
 |---|---|---|
@@ -415,25 +384,3 @@ octets pseudo-aléatoires.
 
 C'est pourquoi on utilise SSH plutôt que Telnet (et `sftp`/`scp` plutôt que
 `ftp`) : la confidentialité et l'intégrité de la session sont assurées.
-
----
-
-# Annexe — comment les captures ont été prises
-
-* **Partie I** : Packet Tracer, enregistrements d'écran
-  (`Windows + Maj + S`) des onglets `CLI`, `Services` et `Desktop` des
-  équipements, déposés dans `TP7/labo/`.
-* **Parties II et III** : la capture `telnet.cap` / `ssh.cap` a été analysée en
-  ligne de commande, ce qui permet de reconstituer les flux TCP :
-
-```
-python3 outils/cap.py flows  FichiersPacketTracer/telnet.cap
-python3 outils/cap.py filter FichiersPacketTracer/telnet.cap "ip.dst == 138.96.241.88"
-python3 outils/cap.py follow FichiersPacketTracer/telnet.cap \
-        --client 138.96.241.88:1823 --server 147.210.36.101:23
-python3 outils/cap.py text   FichiersPacketTracer/ssh.cap --max-strings 8
-```
-
-Sous Wireshark, l'équivalent est *Statistics → Conversations* pour la liste des
-conversations, la barre de filtre `ip.dst == …` pour la sélection des paquets, et
-*Follow → TCP Stream* pour la reconstitution d'une session.
