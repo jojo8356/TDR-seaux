@@ -7,6 +7,7 @@ qui les fabrique.
 TP7/
 ├── TP7.md                              ← le rapport : réponses + captures (ton travail)
 ├── EXERCICE-1-etapes-packet-tracer.md  ← mode opératoire clic par clic (exercice 1)
+├── CAPTURES-WIRESHARK-parties-2-et-3.md ← les captures Wireshark à prendre (parties II et III)
 ├── make_screenshots.py                 ← génère tout le dossier screenshots/
 ├── labo/                               ← tes captures Packet Tracer, rangées et nommées
 ├── screenshots/                        ← captures d'écran générées (parties II et III)
