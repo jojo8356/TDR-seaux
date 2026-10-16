@@ -102,6 +102,20 @@ show ip route
 
 ![Router0 : route statique et vérification](labo/03-router0-cli.png)
 
+Le relais fonctionne : le poste, qui n'a pas encore d'adresse, envoie sa demande
+**en broadcast** (`0.0.0.0` → `255.255.255.255`, UDP 68 → 67), le routeur la
+transforme en unicast vers `172.16.24.12` — c'est le `ip helper-address` — et la
+réponse revient avec l'adresse attribuée et l'option DNS.
+
+![Le poste envoie sa demande DHCP en broadcast](labo/09b-dhcp-requete-broadcast.png)
+
+![La réponse du serveur DHCP : adresse attribuée et DNS](labo/09b-dhcp-reponse-serveur.png)
+
+Sur la réponse on lit `YOUR CLIENT ADDRESS: 192.168.20.102` (l'adresse donnée au
+poste), `SERVER ADDRESS: 172.16.24.12` et l'option 6
+`DHCP Domain Name Server Option: 172.16.24.11` : c'est bien le DHCP qui
+transmet l'adresse du serveur DNS aux postes.
+
 `Router1` est adressé de la même façon (WAN sur `Gig0/0`, LAN des serveurs sur
 `Gig0/1`) avec une route par défaut :
 
