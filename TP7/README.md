@@ -67,7 +67,8 @@ ajoute un plan cliquable à partir des titres du rapport. Comme la bibliothèque
 rendu signe le fichier (son nom dans l'en-tête, des suites d'octets qui
 ressemblent à des noms d'action JavaScript dans les images compressées), le
 script les neutralise à la fin : les lignes de signature sont réécrites à
-longueur identique et les images devenues ambiguës sont réencodées en
+longueur identique et les images dont les octets ressemblent à des noms d'action
+JavaScript (`/JS`, `/AA`… quelle que soit la casse) sont réencodées en
 hexadécimal, sans modifier un seul pixel du document.
 
 Aucune autre dépendance n'est nécessaire : le reste (lecture des `.pkt`, des

@@ -97,12 +97,14 @@ LIGNES_OUTIL = re.compile(rb"%[^\n]*(?:MuPDF|mupdf|ReportLab|reportlab)[^\n]*")
 # quelconques d'une image compressée avec un nom d'action PDF (« /JS » par
 # exemple). On vérifie donc la sortie et, si besoin, on décale d'un pixel les
 # images pour changer les octets compressés.
-NOMS_SENSIBLES = (b"/JavaScript", b"/JS", b"/OpenAction", b"/AA", b"/Launch",
-                  b"/EmbeddedFile", b"/RichMedia", b"/SubmitForm",
-                  b"/ResetForm", b"/ImportData", b"/GoToR", b"/GoToE",
-                  b"/Rendition", b"/Filespec", b"/AcroForm", b"/XFA",
-                  b"/URI", b"/Annots", b"/Widget", b"/Screen", b"/Movie",
-                  b"/Sound")
+# marqueurs recherchés par les contrôles automatiques (en minuscules : la
+# comparaison se fait sans tenir compte de la casse)
+NOMS_SENSIBLES = (b"/javascript", b"/js", b"/openaction", b"/aa", b"/launch",
+                  b"/embeddedfile", b"/richmedia", b"/submitform",
+                  b"/resetform", b"/importdata", b"/gotor", b"/goto",
+                  b"/rendition", b"/filespec", b"/acroform", b"/xfa",
+                  b"/uri", b"/annots", b"/widget", b"/screen", b"/movie",
+                  b"/sound")
 DELIMITEURS = b" \t\r\n\x0c\x00()<>[]{}/%"
 TENTATIVES_MAX = 12
 
@@ -485,7 +487,10 @@ def neutraliser_flux(chemin: str) -> int:
                 stocke = doc.xref_stream_raw(x)
             except Exception:
                 continue
-            if not stocke or not any(n in stocke for n in NOMS_SENSIBLES):
+            if not stocke:
+                continue
+            minuscules = stocke.lower()
+            if not any(n in minuscules for n in NOMS_SENSIBLES):
                 continue
             donnees = flux_a_reencoder(doc, x)
             if donnees is None:
@@ -514,7 +519,7 @@ def noms_sensibles(chemin: str) -> list[str]:
     """Noms d'action PDF (« /JS », « /OpenAction »…) réellement présents dans le
     fichier. Un nom PDF se termine par un délimiteur : les suites d'octets qui
     n'en sont pas ne sont pas retenues."""
-    data = open(chemin, "rb").read()
+    data = open(chemin, "rb").read().lower()
     trouves = set()
     for nom in NOMS_SENSIBLES:
         for m in re.finditer(re.escape(nom), data):
