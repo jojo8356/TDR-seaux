@@ -317,20 +317,19 @@ traversés).
 résolution des noms, `172.16.24.20` et `172.16.24.30` pour les pages web.**
 
 Dans la maquette, les rôles sont déjà séparés : le DNS est sur un serveur et les
-sites web sur deux autres. Ce que cela change :
-
-1. **Les services sont indépendants.** On l'a vérifié en éteignant le DNS : les
-   noms ne se résolvent plus, mais `http://172.16.24.20` continue de fonctionner.
-   Inversement, si un serveur web tombe, le DNS continue de répondre. Avec un
-   seul serveur pour tout, la moindre panne coupe **tous** les services d'un coup.
-2. **La disponibilité et la charge.** Le DNS reçoit beaucoup de requêtes très
-   courtes ; le HTTP transfère de gros volumes. Séparer évite qu'ils se
-   ralentissent mutuellement, et on peut limiter ou filtrer chacun séparément.
-3. **La configuration côté clients ne change pas** : le navigateur et le système
-   interrogent simplement le serveur DNS reçu par DHCP, que celui-ci soit sur la
-   même machine que le serveur web ou non.
-4. **En contrepartie**, il faut administrer deux (ou trois) machines et réserver
-   autant d'adresses IP fixes — c'est le prix de cette séparation.
+sites web sur deux autres. Ce que cela change : d'abord, **les services sont
+indépendants**, on l'a vérifié en éteignant le DNS, les noms ne se résolvent
+plus mais `http://172.16.24.20` continue de fonctionner, et inversement si un
+serveur web tombe le DNS continue de répondre, alors qu'avec un seul serveur
+pour tout la moindre panne coupe **tous** les services d'un coup. Ensuite, **la
+disponibilité et la charge** : le DNS reçoit beaucoup de requêtes très courtes
+tandis que le HTTP transfère de gros volumes, les séparer évite qu'ils se
+ralentissent mutuellement et permet de limiter ou de filtrer chacun
+séparément. **La configuration côté clients ne change pas** non plus : le
+navigateur et le système interrogent simplement le serveur DNS reçu par DHCP,
+que celui-ci soit sur la même machine que le serveur web ou non. **En
+contrepartie**, il faut administrer deux (ou trois) machines et réserver autant
+d'adresses IP fixes : c'est le prix de cette séparation.
 
 **Vérification dans la maquette** — avec `DNS Service : Off` sur `DNS-Server`
 (les deux enregistrements `A` restent dans la table) :
@@ -391,24 +390,21 @@ En suivant le flux TCP de la session, Wireshark reconstitue tout le texte
 
 ![Wireshark : la session reconstituée en texte clair](labo/21-telnet-session-en-clair.png)
 
-**Les informations consultées, dans l'ordre :**
-
-1. l'en-tête de la ligne Telnet `telnet (frbdx13)` puis `AIX version 4` /
-   `(C) Copyrights by IBM and by others 1982, 1996.` → le serveur est une
-   machine **IBM AIX 4** ;
-2. `Connexion: grace` → le **nom d'utilisateur** est `grace` ; puis la
-   `Dernière connexion: jeu 21 fév 17:01:53 NFT 2008 le /dev/pts/0 à partir de
-   bougeotte.inria.fr` (date et poste de la connexion précédente) ;
-3. la bannière de l'application **GRACE** (*Gestion du Réseau Automatisé de
-   Catalogues En-ligne*), version 3.60, le `21/02/2008 - 17:04`, et son menu
-   (AIDE, JOURNAL, INFORMATION, QUITTER) ;
-4. l'**aide en ligne** en 3 pages (`GENERALITES 1/3`, `2/3`, `AIDE GENERALE 3/3`)
-   — le client a tapé `A` ;
-5. le **B.I.P.E.D.** (*Bulletin d'Information pour Étudiants en Détresse*) et ses
-   rubriques : `L'INFORMATIQUE à la B.U.`, `L'AVENIR INFORMATIQUE`, `G.R.A.C.E`,
-   `G.R.A.C.E (suite)`, `SIBIL`, `Les MICRO-ORDINATEURS pour la R.D.I.` ;
-6. le **JOURNAL** (« DERNIERES NOUVELLES de GRACE ») puis la page de sortie
-   « GRACE vous remercie de votre visite » avec l'horloge du serveur `17:05:41`.
+**Les informations consultées, dans l'ordre :** d'abord l'en-tête de la ligne
+Telnet `telnet (frbdx13)` puis `AIX version 4` / `(C) Copyrights by IBM and by
+others 1982, 1996.`, donc le serveur est une machine **IBM AIX 4** ; ensuite
+`Connexion: grace`, qui donne le **nom d'utilisateur** `grace`, suivi de la
+`Dernière connexion: jeu 21 fév 17:01:53 NFT 2008 le /dev/pts/0 à partir de
+bougeotte.inria.fr` (date et poste de la connexion précédente) ; puis la
+bannière de l'application **GRACE** (*Gestion du Réseau Automatisé de Catalogues
+En-ligne*), version 3.60, le `21/02/2008 - 17:04`, avec son menu (AIDE, JOURNAL,
+INFORMATION, QUITTER) ; puis l'**aide en ligne** en 3 pages (`GENERALITES 1/3`,
+`2/3`, `AIDE GENERALE 3/3`), parce que le client a tapé `A` ; puis le
+**B.I.P.E.D.** (*Bulletin d'Information pour Étudiants en Détresse*) et ses
+rubriques (`L'INFORMATIQUE à la B.U.`, `L'AVENIR INFORMATIQUE`, `G.R.A.C.E`,
+`G.R.A.C.E (suite)`, `SIBIL`, `Les MICRO-ORDINATEURS pour la R.D.I.`) ; et enfin
+le **JOURNAL** (« DERNIERES NOUVELLES de GRACE ») puis la page de sortie « GRACE
+vous remercie de votre visite » avec l'horloge du serveur `17:05:41`.
 
 Plus bas dans le même flux, on retrouve la page de présentation de GRACE et le
 début du bulletin **B.I.P.E.D.** (`G.R.A.C.E (Suite)`, SIBIL, l'aide en ligne) :
@@ -418,22 +414,18 @@ début du bulletin **B.I.P.E.D.** (`G.R.A.C.E (Suite)`, SIBIL, l'aide en ligne) 
 ## 4. Expliquez le résultat obtenu
 
 Ce sont des **informations textuelles** du catalogue documentaire qui circulent
-en clair : rien n'est chiffré.
-
-- Sur 178 paquets, **126 vont vers le client** : le serveur renvoie tout ce qu'il
-  affiche, plus l'**écho de chaque caractère** tapé (les paquets d'un seul octet
-  `g`, `r`, `a`, `c`… quand l'utilisateur saisit `grace`) et les acquittements
-  TCP. C'est le **terminal** de l'utilisateur qui est renvoyé à distance, écran
-  par écran.
-- Le client, lui, n'a envoyé que **117 octets** au total : son login, ses
-  quelques touches (`A`, `S`, `R`, `I`, `J`, `F`, `Q`) et les retours de ligne.
-- Les pages contiennent des **codes de commande du terminal** (couleurs,
-  positionnement du curseur, effacement d'écran) : en les retirant, on lit
-  exactement ce que l'utilisateur avait à l'écran.
-
-**Conclusion :** Telnet transmet **tout en clair** — jusqu'au mot de passe. Une
-simple capture réseau suffit donc à reconstituer une session et à récupérer des
-identifiants : c'est la raison pour laquelle Telnet est remplacé par **SSH**.
+en clair : rien n'est chiffré. Sur 178 paquets, **126 vont vers le client** — le
+serveur renvoie tout ce qu'il affiche, plus l'**écho de chaque caractère** tapé
+(les paquets d'un seul octet `g`, `r`, `a`, `c`… quand l'utilisateur saisit
+`grace`) et les acquittements TCP, parce que c'est le **terminal** de
+l'utilisateur qui est renvoyé à distance, écran par écran. Le client, lui, n'a
+envoyé que **117 octets** au total : son login, ses quelques touches (`A`, `S`,
+`R`, `I`, `J`, `F`, `Q`) et les retours de ligne. Les pages contiennent aussi des
+**codes de commande du terminal** (couleurs, positionnement du curseur,
+effacement d'écran) : en les retirant, on lit exactement ce que l'utilisateur
+avait à l'écran. Telnet transmet donc **tout en clair**, jusqu'au mot de passe :
+une simple capture réseau suffit à reconstituer une session et à récupérer des
+identifiants, c'est la raison pour laquelle Telnet est remplacé par **SSH**.
 
 ---
 
@@ -460,15 +452,12 @@ texte.
 
 **a) Avant le chiffrement, tout est lisible** : les deux programmes s'annoncent
 (`SSH-2.0-PuTTY_Release_0.58` côté client, `SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6`
-côté serveur) et **négocient les algorithmes** :
-
-* échange de clés : `diffie-hellman-group-exchange-sha1`,
-  `diffie-hellman-group14-sha1`, `diffie-hellman-group1-sha1` ;
-* clés d'hôte : `ssh-rsa`, `ssh-dss` ;
-* chiffrement : `aes256-cbc`, `aes192-cbc`, `aes128-cbc`, `3des-cbc`,
-  `blowfish-cbc`, `arcfour`… ;
-* intégrité : `hmac-sha1`, `hmac-md5` ;
-* compression : `none`, `zlib`.
+côté serveur) et **négocient les algorithmes**, à savoir
+`diffie-hellman-group-exchange-sha1`, `diffie-hellman-group14-sha1` et
+`diffie-hellman-group1-sha1` pour l'échange de clés, `ssh-rsa` et `ssh-dss` pour
+les clés d'hôte, `aes256-cbc`, `aes192-cbc`, `aes128-cbc`, `3des-cbc`,
+`blowfish-cbc` et `arcfour`… pour le chiffrement, `hmac-sha1` et `hmac-md5` pour
+l'intégrité, `none` et `zlib` pour la compression.
 
 ![Wireshark : la négociation des algorithmes, en clair](labo/25-ssh-negociation.png)
 
