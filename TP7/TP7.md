@@ -61,6 +61,8 @@ sera donnée aux postes).
 | `VLAN10` | 192.168.10.1 | 172.16.24.11 | 192.168.10.100 | 255.255.255.0 |
 | `VLAN20` | 192.168.20.1 | 172.16.24.11 | 192.168.20.100 | 255.255.255.0 |
 
+![DHCP-Server : le service activé et les 3 pools](labo/05-dhcp-pools.png)
+
 
 ## 3. Indiquer au routeur la « UDP Helper Address » (`ip helper-address`)
 
