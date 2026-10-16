@@ -293,6 +293,11 @@ Alors que l'accès par adresse IP continue de fonctionner :
 | **Client** | `138.96.241.88` | `1823` (port éphémère) |
 | **Serveur** | `147.210.36.101` | `23` |
 
+![Wireshark : la conversation TCP unique de la capture](labo/19-telnet-conversations.png)
+
+Une seule conversation TCP dans la capture : `138.96.241.88:1823` vers
+`147.210.36.101:23`, sur **178 paquets** — dont 126 du serveur vers le client.
+
 ## 3. Quelles sont les informations qu'a consultées le client ? Filtre `ip.dst == 138.96.41.88`
 
 Le filtre `ip.dst == 138.96.241.88` garde tous les paquets **reçus par le
