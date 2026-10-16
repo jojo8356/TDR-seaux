@@ -334,6 +334,11 @@ En suivant le flux TCP de la session, Wireshark reconstitue tout le texte
 6. le **JOURNAL** (« DERNIERES NOUVELLES de GRACE ») puis la page de sortie
    « GRACE vous remercie de votre visite » avec l'horloge du serveur `17:05:41`.
 
+Plus bas dans le même flux, on retrouve la page de présentation de GRACE et le
+début du bulletin **B.I.P.E.D.** (`G.R.A.C.E (Suite)`, SIBIL, l'aide en ligne) :
+
+![Wireshark : les pages consultées dans la session](labo/22-telnet-pages-consultees.png)
+
 ## 4. Expliquez le résultat obtenu
 
 Ce sont des **informations textuelles** du catalogue documentaire qui circulent
