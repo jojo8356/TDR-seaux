@@ -375,7 +375,11 @@ côté serveur) et **négocient les algorithmes** :
 ![Wireshark : la négociation des algorithmes, en clair](labo/25-ssh-negociation.png)
 
 **b) Après l'échange de clés, plus rien n'est lisible** : l'authentification de
-l'utilisateur, le mot de passe et les commandes sont **chiffrés**.
+l'utilisateur, le mot de passe et les commandes sont **chiffrés**. Les algorithmes
+retenus sont ceux négociés au début : `aes256-cbc` pour le chiffrement et
+`hmac-sha1` pour l'intégrité.
+
+![Wireshark : les paquets suivants sont chiffrés](labo/26-ssh-chiffre.png)
 
 C'est toute la différence avec Telnet : SSH **chiffre** la session (ici AES ou
 3DES) et **vérifie son intégrité** (HMAC), donc une capture ne permet plus de
