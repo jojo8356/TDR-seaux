@@ -164,13 +164,18 @@ Relevés sur `Router1` :
 On met les 4 postes en **DHCP** (`Desktop → IP Configuration` → *DHCP*) et on
 relève les adresses réellement obtenues :
 
-| Poste | Adresse relevée | Passerelle | DNS | Où on la lit |
-|---|---|---|---|---|
-| `PC0` | `192.168.20.100` | `192.168.20.1` | `172.16.24.11` | *IP Configuration* (DHCP) et `ipconfig /renew` |
-| `Laptop0` | `192.168.10.100` | `192.168.10.1` | `172.16.24.11` | réponses au ping avec **TTL 128** (même VLAN) |
-| `Laptop1` | `192.168.10.101` | `192.168.10.1` | `172.16.24.11` | idem, vu depuis `Laptop0` |
+| Poste | Adresse obtenue | Passerelle | DNS |
+|---|---|---|---|
+| `PC0` | `192.168.20.100` | `192.168.20.1` | `172.16.24.11` |
+| `Laptop2` | `192.168.20.101` | `192.168.20.1` | `172.16.24.11` |
+| `Laptop0` | `192.168.10.102` | `192.168.10.1` | `172.16.24.11` |
+| `Laptop1` | `192.168.10.101` | `192.168.10.1` | `172.16.24.11` |
 
 ![PC0 : adresse obtenue en DHCP](labo/07-pc0-ipconfig.png)
+
+![Laptop0 : adresse obtenue en DHCP](labo/07b-laptop0-ipconfig.png)
+
+![Laptop2 : adresse obtenue en DHCP](labo/08-laptop2-ipconfig.png)
 
 **a) Depuis PC0 (VLAN 20) vers le VLAN 10, vers le serveur DHCP et par nom :**
 
@@ -191,12 +196,12 @@ Depuis `PC0` (`192.168.20.100`, VLAN 20) :
 | `ping 172.16.24.12` | **4/4 (0 %)**, **TTL 126**, min 0 / max 5 / moy 1 ms |
 | `ping www.carrillo.edu` | résolu en `172.16.24.20`, **4/4 (0 %)**, **TTL 126** |
 
-Depuis `Laptop0` (`192.168.10.100`, VLAN 10) :
+Depuis `Laptop0` (`192.168.10.102`, VLAN 10) :
 
 | Test | Résultat mesuré |
 |---|---|
-| `ping 192.168.10.100` | **4/4 (0 %)** — c'est lui-même, **TTL 128**, 8 / 19 / 11 ms |
-| `ping 192.168.10.101` | **4/4 (0 %)**, **TTL 128** — même VLAN, aucun routeur traversé |
+| `ping 192.168.10.100` | **4/4 (0 %)** — c'est la passerelle du VLAN 10 (`Router0`), **TTL 128**, 8 / 19 / 11 ms |
+| `ping 192.168.10.101` | **4/4 (0 %)**, **TTL 128** — `Laptop1`, même VLAN, aucun routeur traversé |
 | `ping 172.16.24.12` | **4/4 (0 %)**, **TTL 126** |
 | `ping www.carrillo.edu` | résolu en `172.16.24.20`, **4/4 (0 %)**, **TTL 126** |
 
