@@ -305,6 +305,11 @@ client** : c'est exactement ce que le serveur lui a renvoyé, donc ce que le
 client a consulté. La session Telnet est transmise **en clair**, on peut donc
 lire tout son contenu.
 
+Le login lui-même se lit caractère par caractère : chaque lettre de `grace` part
+dans un paquet d'un seul octet, que l'on peut ouvrir dans Wireshark.
+
+![Wireshark : la lettre « g » du login envoyée en clair](labo/20-telnet-login-en-clair.png)
+
 **Les informations consultées, dans l'ordre :**
 
 1. l'en-tête de la ligne Telnet `telnet (frbdx13)` puis `AIX version 4` /
