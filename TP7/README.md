@@ -6,6 +6,8 @@ qui les fabrique.
 ```
 TP7/
 ├── TP7.md                              ← le rapport : réponses + captures (ton travail)
+├── TP7.pdf                             ← le même rapport en PDF (thème GitHub Light)
+├── make_pdf.py                         ← génère TP7.pdf depuis TP7.md
 ├── EXERCICE-1-etapes-packet-tracer.md  ← mode opératoire clic par clic (exercice 1)
 ├── CAPTURES-WIRESHARK-parties-2-et-3.md ← les captures Wireshark à prendre (parties II et III)
 ├── make_screenshots.py                 ← génère tout le dossier screenshots/
@@ -47,6 +49,17 @@ python -m pip install pillow
 python TP7\make_screenshots.py
 dir TP7\screenshots
 ```
+
+### Générer le PDF
+
+```bash
+python3 -m pip install --user reportlab pillow
+python3 TP7/make_pdf.py            # écrit TP7/TP7.pdf
+```
+
+Le PDF reprend le thème « GitHub Light » (titres soulignés, tableaux gris clair,
+code sur fond `#f6f8fa`) et pagine « page X / Y ». Il est déjà versionné dans le
+dépôt : `TP7/TP7.pdf`.
 
 Aucune autre dépendance n'est nécessaire : le reste (lecture des `.pkt`, des
 `.cap`) est du Python standard, cf. `outils/README.md`.
