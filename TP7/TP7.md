@@ -356,6 +356,8 @@ le port éphémère `1869`.
 **Oui : PuTTY release 0.58.** La chaîne d'identification du client est
 `SSH-2.0-PuTTY_Release_0.58`, affichée en clair au début de la session.
 
+![Wireshark : le client s'annonce PuTTY 0.58](labo/24-ssh-client-putty.png)
+
 ## 3. Quelles sont les informations qui circulent ? Commenter.
 
 **a) Avant le chiffrement, tout est lisible** : les deux programmes s'annoncent
