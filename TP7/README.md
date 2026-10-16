@@ -53,13 +53,22 @@ dir TP7\screenshots
 ### Générer le PDF
 
 ```bash
-python3 -m pip install --user reportlab pillow
+python3 -m pip install --user reportlab pillow pymupdf
 python3 TP7/make_pdf.py            # écrit TP7/TP7.pdf
 ```
 
 Le PDF reprend le thème « GitHub Light » (titres soulignés, tableaux gris clair,
 code sur fond `#f6f8fa`) et pagine « page X / Y ». Il est déjà versionné dans le
 dépôt : `TP7/TP7.pdf`.
+
+Le script complète aussi les métadonnées du document (titre, auteur et créateur
+« Johan Polsinelli », description, mots-clés, moteur `unknown`, fiche XMP) et
+ajoute un plan cliquable à partir des titres du rapport. Comme la bibliothèque de
+rendu signe le fichier (son nom dans l'en-tête, des suites d'octets qui
+ressemblent à des noms d'action JavaScript dans les images compressées), le
+script les neutralise à la fin : les lignes de signature sont réécrites à
+longueur identique et les images devenues ambiguës sont réencodées en
+hexadécimal, sans modifier un seul pixel du document.
 
 Aucune autre dépendance n'est nécessaire : le reste (lecture des `.pkt`, des
 `.cap`) est du Python standard, cf. `outils/README.md`.
