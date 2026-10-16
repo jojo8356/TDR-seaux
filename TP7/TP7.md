@@ -349,6 +349,8 @@ Au serveur **`134.59.22.22`, port 22**, d'après la première chaîne envoyée p
 le serveur : `SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6`. Le client, lui, utilise
 le port éphémère `1869`.
 
+![Wireshark : le serveur annonce OpenSSH 3.8.1p1](labo/23-ssh-banniere-serveur.png)
+
 ## 2. Le client a-t-il utilisé un logiciel ? Si oui, lequel ?
 
 **Oui : PuTTY release 0.58.** La chaîne d'identification du client est
