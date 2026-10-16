@@ -372,6 +372,8 @@ côté serveur) et **négocient les algorithmes** :
 * intégrité : `hmac-sha1`, `hmac-md5` ;
 * compression : `none`, `zlib`.
 
+![Wireshark : la négociation des algorithmes, en clair](labo/25-ssh-negociation.png)
+
 **b) Après l'échange de clés, plus rien n'est lisible** : l'authentification de
 l'utilisateur, le mot de passe et les commandes sont **chiffrés**.
 
