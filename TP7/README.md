@@ -9,6 +9,7 @@ TP7/
 ├── EXERCICE-1-etapes-packet-tracer.md  ← mode opératoire clic par clic (exercice 1)
 ├── CAPTURES-WIRESHARK-parties-2-et-3.md ← les captures Wireshark à prendre (parties II et III)
 ├── make_screenshots.py                 ← génère tout le dossier screenshots/
+├── aide/                               ← captures annotées pour t'aider (où cliquer dans Wireshark)
 ├── labo/                               ← tes captures Packet Tracer, rangées et nommées
 ├── screenshots/                        ← captures d'écran générées (parties II et III)
 └── screenshots-originaux/              ← tes 28 enregistrements d'écran bruts
