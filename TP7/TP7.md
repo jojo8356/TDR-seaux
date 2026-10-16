@@ -310,6 +310,11 @@ dans un paquet d'un seul octet, que l'on peut ouvrir dans Wireshark.
 
 ![Wireshark : la lettre « g » du login envoyée en clair](labo/20-telnet-login-en-clair.png)
 
+En suivant le flux TCP de la session, Wireshark reconstitue tout le texte
+échangé, sans rien déchiffrer : le début de la session est directement lisible.
+
+![Wireshark : la session reconstituée en texte clair](labo/21-telnet-session-en-clair.png)
+
 **Les informations consultées, dans l'ordre :**
 
 1. l'en-tête de la ligne Telnet `telnet (frbdx13)` puis `AIX version 4` /
