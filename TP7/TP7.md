@@ -12,7 +12,9 @@
 
 La maquette de départ contient 4 postes, 2 switchs, 2 routeurs et 1 serveur.
 Deux VLAN sont **déjà** configurés sur `Switch0`, et les sous-interfaces du
-routeur sont créées mais **sans adresse IP**.
+routeur sont créées mais **sans adresse IP**. Relevé de la configuration du
+switch : `Fa0/1` et `Fa0/2` en VLAN 10, `Fa0/3` et `Fa0/4` en VLAN 20, `Fa0/5` en
+**trunk** vers `Router0`.
 
 **Plan d'adressage utilisé** (celui du sujet et de la figure) :
 
@@ -44,7 +46,9 @@ Le serveur DHCP reçoit une **adresse fixe** `172.16.24.12/16` avec la passerell
 adresse).
 
 Le service est activé dans l'onglet **Services → DHCP** (*Service : On*), puis on
-crée le pool du réseau des serveurs avec `Add` **puis** `Save`.
+crée le pool du réseau des serveurs avec `Add` **puis** `Save`. Pour chaque pool
+on renseigne aussi **Maximum Number of Users = `50`** ; `TFTP Server` et
+`WLC Address` restent à `0.0.0.0`, on ne s'en sert pas.
 
 | Pool | Default Gateway | DNS Server | Start IP | Subnet Mask |
 |---|---|---|---|---|
@@ -102,6 +106,18 @@ show ip route
 
 ![Router0 : route statique et vérification](labo/03-router0-cli.png)
 
+La sortie `show ip route` de `Router0` :
+
+```
+C    10.6.8.0/30 is directly connected, FastEthernet0/1
+S    172.16.0.0/16 [1/0] via 10.6.8.2
+C    192.168.10.0/24 is directly connected, FastEthernet0/0.10
+C    192.168.20.0/24 is directly connected, FastEthernet0/0.20
+```
+
+et `Router0#ping 172.16.24.1` répond **5/5 (100 %)**, `round-trip 0/0/0 ms` :
+le LAN des serveurs est joignable à travers `Router1`.
+
 Le relais fonctionne : le poste, qui n'a pas encore d'adresse, envoie sa demande
 **en broadcast** (`0.0.0.0` → `255.255.255.255`, UDP 68 → 67), le routeur la
 transforme en unicast vers `172.16.24.12` — c'est le `ip helper-address` — et la
@@ -131,6 +147,16 @@ ip route 0.0.0.0 0.0.0.0 10.6.8.1
 
 ![Router1 : interfaces, route par défaut et pings](labo/04-router1-cli.png)
 
+Relevés sur `Router1` :
+
+| Commande | Résultat mesuré |
+|---|---|
+| `show ip route` | `S* 0.0.0.0/0 [1/0] via 10.6.8.1`, `C 10.6.8.0/30 directly connected, GigabitEthernet0/0`, `C 172.16.0.0/16 directly connected, GigabitEthernet0/1` |
+| `show ip int brief` | `Gig0/0 10.6.8.2 up/up`, `Gig0/1 172.16.24.1 up/up`, `Vlan1 administratively down` |
+| `ping 10.6.8.1` | 4/5 (80 %) au 1er essai (ARP), puis **5/5 (100 %)** |
+| `ping 192.168.10.1` | **5/5 (100 %)** — le VLAN 10 répond |
+| `ping 192.168.20.1` | **5/5 (100 %)** — le VLAN 20 répond |
+
 ---
 
 ## 4. Faire les tests avec différents ping
@@ -138,16 +164,13 @@ ip route 0.0.0.0 0.0.0.0 10.6.8.1
 On met les 4 postes en **DHCP** (`Desktop → IP Configuration` → *DHCP*) et on
 relève les adresses réellement obtenues :
 
-| Poste | VLAN | Adresse obtenue | Passerelle | DNS |
+| Poste | Adresse relevée | Passerelle | DNS | Où on la lit |
 |---|---|---|---|---|
-| `PC0` | 20 | `192.168.20.100` | 192.168.20.1 | 172.16.24.11 |
-| `Laptop2` | 20 | `192.168.20.101` | 192.168.20.1 | 172.16.24.11 |
-| `Laptop0` | 10 | `192.168.10.100` | 192.168.10.1 | 172.16.24.11 |
-| `Laptop1` | 10 | `192.168.10.101` | 192.168.10.1 | 172.16.24.11 |
+| `PC0` | `192.168.20.100` | `192.168.20.1` | `172.16.24.11` | *IP Configuration* (DHCP) et `ipconfig /renew` |
+| `Laptop0` | `192.168.10.100` | `192.168.10.1` | `172.16.24.11` | réponses au ping avec **TTL 128** (même VLAN) |
+| `Laptop1` | `192.168.10.101` | `192.168.10.1` | `172.16.24.11` | idem, vu depuis `Laptop0` |
 
 ![PC0 : adresse obtenue en DHCP](labo/07-pc0-ipconfig.png)
-
-![Laptop0 : adresse obtenue en DHCP](labo/08-laptop0-ipconfig.png)
 
 **a) Depuis PC0 (VLAN 20) vers le VLAN 10, vers le serveur DHCP et par nom :**
 
@@ -157,13 +180,31 @@ relève les adresses réellement obtenues :
 
 ![Pings depuis Laptop0](labo/10-laptop0-pings.png)
 
-**Résultats obtenus :**
+**Résultats obtenus, relevés dans les captures.**
 
-| Test | Résultat | Ce que ça démontre |
-|---|---|---|
-| `ping 192.168.10.100` / `.101` | 4 réponses sur 4 | le routage inter-VLAN par les sous-interfaces de `Router0` fonctionne |
-| `ping 172.16.24.12` | 4 sur 4 | toute la chaîne : VLAN → Router0 → WAN → Router1 → LAN des serveurs |
-| `ping www.carrillo.edu` | `Pinging 172.16.24.20` puis 4 sur 4 | le nom a été **résolu par le DNS** avant l'envoi des échos |
+Depuis `PC0` (`192.168.20.100`, VLAN 20) :
+
+| Test | Résultat mesuré |
+|---|---|
+| `ping 192.168.10.100` | 3/4 — 1 perdu (25 %), réponses **TTL 127** |
+| `ping 192.168.10.101` | 3/4 — 1 perdu (25 %), réponses **TTL 127** |
+| `ping 172.16.24.12` | **4/4 (0 %)**, **TTL 126**, min 0 / max 5 / moy 1 ms |
+| `ping www.carrillo.edu` | résolu en `172.16.24.20`, **4/4 (0 %)**, **TTL 126** |
+
+Depuis `Laptop0` (`192.168.10.100`, VLAN 10) :
+
+| Test | Résultat mesuré |
+|---|---|
+| `ping 192.168.10.100` | **4/4 (0 %)** — c'est lui-même, **TTL 128**, 8 / 19 / 11 ms |
+| `ping 192.168.10.101` | **4/4 (0 %)**, **TTL 128** — même VLAN, aucun routeur traversé |
+| `ping 172.16.24.12` | **4/4 (0 %)**, **TTL 126** |
+| `ping www.carrillo.edu` | résolu en `172.16.24.20`, **4/4 (0 %)**, **TTL 126** |
+
+Le **TTL** mesure la distance : `128` = aucun routeur traversé (les deux postes
+sont dans le VLAN 10), `127` = un routeur (`Router0` entre les deux VLAN), `126` =
+deux routeurs (`Router0` + `Router1` jusqu'au LAN des serveurs). Le premier écho
+est parfois perdu (« Request timed out ») : c'est la résolution ARP avant la
+première réponse ; les suivants passent à 100 %.
 
 ---
 
@@ -206,19 +247,19 @@ une page qui identifie le serveur (pour bien voir lequel répond) :
 **Il faut renseigner l'adresse du serveur DNS dans chacun des pools DHCP** (et
 sauvegarder), puis renouveler le bail des postes.
 
-Avant, le champ *DNS Server* des pools valait `0.0.0.0` : les postes recevaient
-une adresse, un masque et une passerelle, mais **aucun serveur DNS**. Ils
-pouvaient donc joindre un serveur **par son adresse IP**, mais pas **par son
-nom** : la résolution échouait.
+Quand le champ *DNS Server* d'un pool n'est pas renseigné, le poste reçoit une
+adresse, un masque et une passerelle, mais **aucun serveur DNS** : il peut donc
+joindre un serveur **par son adresse IP**, mais pas **par son nom**.
 
-On met donc **DNS Server = `172.16.24.11`** dans les trois pools
-(`serverPool`, `VLAN10`, `VLAN20`) et on clique `Save`.
+On met donc **DNS Server = `172.16.24.11`** dans les trois pools (`serverPool`,
+`VLAN10`, `VLAN20`) et on clique `Save` — c'est ce que montre la capture des
+pools au §2.
 
-**Test avec l'option DNS retirée du pool** : sur PC0, après `ipconfig /renew` :
+**Mesure faite sur PC0** (après `ipconfig /renew`) :
 
 ```
-ping 172.16.24.20        ->  4/4 : l'adresse IP répond toujours
-ping www.carrillo.edu    ->  le nom n'est plus résolu
+ping 172.16.24.20        ->  3/4 (1 perdu, 25 %) : l'adresse IP répond toujours
+ping www.carrillo.edu    ->  aucune réponse : le nom n'est pas résolu
 ```
 
 ![Option DNS retirée : le nom ne se résout plus](labo/16-dhcp-sans-dns.png)
@@ -253,9 +294,15 @@ ping www.carrillo.edu
 ![PC0 : résolution des deux noms](labo/12-pc0-dns-verify.png)
 
 Packet Tracer affiche avant le ping l'adresse trouvée :
-`Pinging 172.16.24.30` pour `www.international.com` et `Pinging 172.16.24.20`
-pour `www.carrillo.edu`. **Les deux noms sont donc bien résolus par le serveur
-DNS `172.16.24.11`**, puis les échos ICMP partent vers les serveurs web.
+
+| Commande | Résolution | Résultat mesuré |
+|---|---|---|
+| `ping www.carrillo.edu` | `Pinging 172.16.24.20` | **4/4 (0 %)**, TTL 126, moy 0 ms |
+| `ping www.international.com` | `Pinging 172.16.24.30` | 3/4 (1 perdu, 25 % — 1er paquet ARP), TTL 126 |
+
+**Les deux noms sont donc bien résolus par le serveur DNS `172.16.24.11`**, puis
+les échos ICMP partent vers les serveurs web (TTL 126 : les deux routeurs sont
+traversés).
 
 ---
 
@@ -280,7 +327,8 @@ sites web sur deux autres. Ce que cela change :
 4. **En contrepartie**, il faut administrer deux (ou trois) machines et réserver
    autant d'adresses IP fixes — c'est le prix de cette séparation.
 
-**Vérification dans la maquette** — avec le service DNS éteint sur `DNS-Server` :
+**Vérification dans la maquette** — avec `DNS Service : Off` sur `DNS-Server`
+(les deux enregistrements `A` restent dans la table) :
 
 ![Service DNS éteint](labo/13-dns-service-off.png)
 
@@ -289,6 +337,10 @@ sites web sur deux autres. Ce que cela change :
 ![Le nom échoue : navigateur](labo/14-dns-host-unresolved.png)
 
 ![Le nom échoue : navigateur, autre poste](labo/17-web-sans-dns-echoue.png)
+
+Le ping d'un nom échoue avec le message exact
+`Ping request could not find host www.carrillo.edu. Please check the name and try
+again.` et le navigateur affiche **`Host Name Unresolved`**.
 
 Alors que l'accès par adresse IP continue de fonctionner :
 
@@ -312,7 +364,10 @@ Alors que l'accès par adresse IP continue de fonctionner :
 ![Wireshark : la conversation TCP unique de la capture](labo/19-telnet-conversations.png)
 
 Une seule conversation TCP dans la capture : `138.96.241.88:1823` vers
-`147.210.36.101:23`, sur **178 paquets** — dont 126 du serveur vers le client.
+`147.210.36.101:23`, sur **178 paquets** et **60,1893 s**. Le découpage donné par
+Wireshark : **126 paquets / 40 ko** du serveur vers le client (les pages et
+l'écho des touches) contre **52 paquets / 3 ko** du client vers le serveur (les
+frappes et les acquittements TCP).
 
 ## 3. Quelles sont les informations qu'a consultées le client ? Filtre `ip.dst == 138.96.41.88`
 
@@ -383,7 +438,9 @@ identifiants : c'est la raison pour laquelle Telnet est remplacé par **SSH**.
 
 Au serveur **`134.59.22.22`, port 22**, d'après la première chaîne envoyée par
 le serveur : `SSH-2.0-OpenSSH_3.8.1p1 Debian-8.sarge.6`. Le client, lui, utilise
-le port éphémère `1869`.
+le port éphémère `1869`. La session représente **319 paquets** et **144 537
+octets** — beaucoup plus que la session Telnet, qui ne transportait que du
+texte.
 
 ![Wireshark : le serveur annonce OpenSSH 3.8.1p1](labo/23-ssh-banniere-serveur.png)
 
